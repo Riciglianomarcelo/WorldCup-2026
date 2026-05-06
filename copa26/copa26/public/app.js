@@ -50,20 +50,26 @@ async function joinHandler() {
   btn.disabled = true;
   btn.innerHTML = '<span>Joining...</span>';
 
-  const res = await fetch('/api/join', {
-    method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({ name })
-  });
-  const data = await res.json();
+  try {
+    const res = await fetch('/api/join', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ name })
+    });
+    const data = await res.json();
 
-  if (data.success) {
-    currentUser = data.user;
-    showApp();
-  } else {
+    if (data.success) {
+      currentUser = data.user;
+      showApp();
+    } else {
+      btn.disabled = false;
+      btn.innerHTML = '<span>Let\'s Go</span><span class="btn-icon">→</span>';
+      alert(data.error || 'Something went wrong');
+    }
+  } catch (err) {
     btn.disabled = false;
     btn.innerHTML = '<span>Let\'s Go</span><span class="btn-icon">→</span>';
-    alert(data.error || 'Something went wrong');
+    alert('Connection error — please try again. (' + err.message + ')');
   }
 }
 
@@ -112,6 +118,7 @@ document.querySelectorAll('.nav-btn').forEach(btn => {
     if (tab === 'leaderboard') loadLeaderboard();
     if (tab === 'results') loadResultsTab();
     if (tab === 'dashboard') loadDashboard();
+    if (tab === 'admin') loadAdmin();
   });
 });
 
@@ -604,3 +611,211 @@ function shakeEl(el) {
 // START
 // ===========================
 init();
+
+// ===========================
+// ADMIN PANEL
+// ===========================
+
+let adminConfirmCallback = null;
+
+async function loadAdmin() {
+  const res = await fetch('/api/admin/players');
+  const data = await res.json();
+
+  renderAdminKPIs(data);
+  renderAdminPlayers(data.players, data.resultsSet);
+  renderAdminDangerZone(data.resultsSet);
+}
+
+document.getElementById('refresh-admin-btn').addEventListener('click', loadAdmin);
+
+function renderAdminKPIs(data) {
+  const container = document.getElementById('admin-kpis');
+  const withPicks = data.players.filter(p => p.haspicks).length;
+  const withoutPicks = data.totalPlayers - withPicks;
+  const lastJoined = data.players[0];
+
+  const kpis = [
+    { value: data.totalPlayers, label: 'Total Players', sub: 'registered names' },
+    { value: withPicks, label: 'Picks Submitted', sub: `${data.totalPlayers > 0 ? Math.round((withPicks/data.totalPlayers)*100) : 0}% completion rate` },
+    { value: withoutPicks, label: 'No Picks Yet', sub: 'joined but not submitted' },
+    { value: data.resultsSet ? '🔒' : '🟢', label: 'Status', sub: data.resultsSet ? 'Results set — picks locked' : 'Open — picks allowed' },
+  ];
+
+  container.innerHTML = kpis.map((k, i) => `
+    <div class="dash-kpi" style="animation-delay:${i*60}ms">
+      <div class="dash-kpi-value">${escHtml(String(k.value))}</div>
+      <div class="dash-kpi-label">${k.label}</div>
+      <div class="dash-kpi-sub">${escHtml(k.sub)}</div>
+    </div>
+  `).join('');
+}
+
+function renderAdminDangerZone(resultsSet) {
+  const btn = document.getElementById('admin-reset-results-btn');
+  if (!resultsSet) {
+    btn.disabled = true;
+    btn.textContent = 'No Results Set';
+    btn.style.opacity = '0.4';
+  } else {
+    btn.disabled = false;
+    btn.textContent = 'Reset Results';
+    btn.style.opacity = '1';
+  }
+}
+
+function renderAdminPlayers(players, resultsSet) {
+  const container = document.getElementById('admin-players-list');
+
+  if (!players.length) {
+    container.innerHTML = '<div class="empty-state"><div class="empty-icon">👥</div><p>No players yet</p></div>';
+    return;
+  }
+
+  container.innerHTML = players.map((p, i) => `
+    <div class="admin-player-row ${p.haspicks ? '' : 'no-picks'}" style="animation-delay:${i*40}ms">
+      <div class="admin-p-avatar">${escHtml(p.avatar || '⚽')}</div>
+      <div class="admin-p-info">
+        <div class="admin-p-name">${escHtml(p.name)}</div>
+        <div class="admin-p-meta">
+          Joined ${formatDate(p.joinedAt)}
+          ${p.submittedAt ? ' · Picks: ' + formatDate(p.submittedAt) : ''}
+          ${p.updatedAt && p.updatedAt !== p.submittedAt ? ' · Updated: ' + formatDate(p.updatedAt) : ''}
+        </div>
+      </div>
+      <span class="admin-p-badge ${p.haspicks ? 'badge-picks' : 'badge-nopicks'}">
+        ${p.haspicks ? '✅ picks in' : '⏳ no picks'}
+      </span>
+      <div class="admin-p-joined">${formatDateTime(p.joinedAt)}</div>
+      <div class="admin-p-actions">
+        ${p.haspicks ? `<button class="btn-view" onclick="adminViewPicks('${p.id}', '${escHtml(p.name)}', '${escHtml(p.avatar || '⚽')}')">View Picks</button>` : '<span style="font-size:12px;color:var(--text-muted)">—</span>'}
+        ${p.haspicks ? `<button class="btn-sm-danger" onclick="adminResetPicks('${p.id}', '${escHtml(p.name)}')">Reset Picks</button>` : ''}
+        <button class="btn-sm-danger" onclick="adminDeletePlayer('${p.id}', '${escHtml(p.name)}')">Delete</button>
+      </div>
+    </div>
+  `).join('');
+}
+
+// View a player's picks
+let adminPlayersCache = [];
+
+async function adminViewPicks(userId, name, avatar) {
+  // Get latest data
+  const res = await fetch('/api/admin/players');
+  const data = await res.json();
+  adminPlayersCache = data.players;
+
+  const player = data.players.find(p => p.id === userId);
+  if (!player || !player.picks) return;
+
+  document.getElementById('admin-picks-title').textContent = `${avatar} ${name}'s Picks`;
+
+  const detail = document.getElementById('admin-picks-detail');
+  detail.innerHTML = CATEGORIES.map(cat => {
+    const pick = player.picks[cat.id] || {};
+    const positions = [
+      { label: '🥇 1ST', val: pick.first },
+      { label: '🥈 2ND', val: pick.second },
+      { label: '🥉 3RD', val: pick.third },
+    ].filter(p => p.val);
+
+    return `
+      <div class="admin-picks-cat">
+        <div class="admin-picks-cat-header">
+          <span>${cat.emoji}</span>
+          <span>${cat.label}</span>
+        </div>
+        <div class="admin-picks-positions">
+          ${positions.length ? positions.map(p => `
+            <div class="admin-pick-line">
+              <span class="pick-badge">${p.label}</span>
+              <span>${escHtml(p.val)}</span>
+            </div>
+          `).join('') : '<span style="font-size:12px;color:var(--text-muted)">No pick entered</span>'}
+        </div>
+      </div>
+    `;
+  }).join('');
+
+  document.getElementById('admin-picks-modal').classList.remove('hidden');
+}
+
+// Reset a player's picks
+function adminResetPicks(userId, name) {
+  showAdminConfirm(
+    'Reset Picks',
+    `This will clear all of ${name}'s picks. They can re-submit after. This cannot be undone.`,
+    async () => {
+      const res = await fetch(`/api/admin/players/${userId}/picks`, { method: 'DELETE' });
+      const data = await res.json();
+      if (data.success) loadAdmin();
+      else alert('Error: ' + data.error);
+    }
+  );
+}
+
+// Delete a player entirely
+function adminDeletePlayer(userId, name) {
+  showAdminConfirm(
+    'Delete Player',
+    `This will permanently remove ${name} and all their picks from the pool. This cannot be undone.`,
+    async () => {
+      const res = await fetch(`/api/admin/players/${userId}`, { method: 'DELETE' });
+      const data = await res.json();
+      if (data.success) loadAdmin();
+      else alert('Error: ' + data.error);
+    }
+  );
+}
+
+// Reset results
+document.getElementById('admin-reset-results-btn').addEventListener('click', () => {
+  showAdminConfirm(
+    'Reset Results',
+    'This will clear the official results and unlock everyone\'s picks so they can be updated again.',
+    async () => {
+      const res = await fetch('/api/admin/results', { method: 'DELETE' });
+      const data = await res.json();
+      if (data.success) loadAdmin();
+      else alert('Error: ' + data.error);
+    }
+  );
+});
+
+// Confirm modal helpers
+function showAdminConfirm(title, msg, onConfirm) {
+  document.getElementById('admin-confirm-title').textContent = title;
+  document.getElementById('admin-confirm-msg').textContent = msg;
+  adminConfirmCallback = onConfirm;
+  document.getElementById('admin-confirm-modal').classList.remove('hidden');
+}
+
+document.getElementById('admin-confirm-ok').addEventListener('click', async () => {
+  document.getElementById('admin-confirm-modal').classList.add('hidden');
+  if (adminConfirmCallback) {
+    await adminConfirmCallback();
+    adminConfirmCallback = null;
+  }
+});
+
+['admin-confirm-cancel', 'admin-confirm-close', 'admin-modal-backdrop'].forEach(id => {
+  document.getElementById(id).addEventListener('click', () => {
+    document.getElementById('admin-confirm-modal').classList.add('hidden');
+    adminConfirmCallback = null;
+  });
+});
+
+// Picks modal close
+['admin-picks-close', 'admin-picks-backdrop'].forEach(id => {
+  document.getElementById(id).addEventListener('click', () => {
+    document.getElementById('admin-picks-modal').classList.add('hidden');
+  });
+});
+
+// Helper: full datetime
+function formatDateTime(iso) {
+  if (!iso) return '—';
+  const d = new Date(iso);
+  return d.toLocaleDateString('en-US', { month: 'short', day: 'numeric' }) + ' ' +
+    d.toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit' });
+}

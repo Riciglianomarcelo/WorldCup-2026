@@ -7,10 +7,22 @@ const Datastore = require('nedb-promises');
 const app = express();
 const PORT = process.env.PORT || 3000;
 
-// Data dir: supports Railway volume at /app/data or local ./data
-const DATA_DIR = process.env.DATA_DIR || path.join(__dirname, 'data');
-if (!fs.existsSync(DATA_DIR)) fs.mkdirSync(DATA_DIR, { recursive: true });
-console.log('📁 Data dir:', DATA_DIR);
+// Data dir: try Railway volume /app/data first, then fall back to local ./data
+function resolveDataDir() {
+  const candidates = [process.env.DATA_DIR, '/app/data', path.join(__dirname, 'data')].filter(Boolean);
+  for (const dir of candidates) {
+    try {
+      if (!fs.existsSync(dir)) fs.mkdirSync(dir, { recursive: true });
+      const testFile = path.join(dir, '.write-test');
+      fs.writeFileSync(testFile, 'ok');
+      fs.unlinkSync(testFile);
+      console.log('Data dir:', dir);
+      return dir;
+    } catch (e) { console.log('Skipping', dir, e.message); }
+  }
+  throw new Error('No writable data directory found');
+}
+const DATA_DIR = resolveDataDir();
 
 // --- DB Setup ---
 const db = {
@@ -57,24 +69,32 @@ app.get('/api/categories', (req, res) => {
 });
 
 app.post('/api/join', async (req, res) => {
-  const { name } = req.body;
-  if (!name || name.trim().length < 2) return res.status(400).json({ error: 'Name must be at least 2 characters' });
+  try {
+    const { name } = req.body;
+    if (!name || name.trim().length < 2) return res.status(400).json({ error: 'Name must be at least 2 characters' });
 
-  const clean = name.trim();
-  let user = await db.users.findOne({ nameLower: clean.toLowerCase() });
+    const clean = name.trim();
+    let user = await db.users.findOne({ nameLower: clean.toLowerCase() });
 
-  if (!user) {
-    user = await db.users.insert({
-      name: clean,
-      nameLower: clean.toLowerCase(),
-      joinedAt: new Date().toISOString(),
-      avatar: getAvatar(clean),
+    if (!user) {
+      user = await db.users.insert({
+        name: clean,
+        nameLower: clean.toLowerCase(),
+        joinedAt: new Date().toISOString(),
+        avatar: getAvatar(clean),
+      });
+    }
+
+    req.session.userId = user._id;
+    req.session.userName = user.name;
+    req.session.save((err) => {
+      if (err) return res.status(500).json({ error: 'Session error: ' + err.message });
+      res.json({ success: true, user: { id: user._id, name: user.name, avatar: user.avatar } });
     });
+  } catch (err) {
+    console.error('Join error:', err);
+    res.status(500).json({ error: 'Server error: ' + err.message });
   }
-
-  req.session.userId = user._id;
-  req.session.userName = user.name;
-  res.json({ success: true, user: { id: user._id, name: user.name, avatar: user.avatar } });
 });
 
 app.get('/api/me', (req, res) => {
@@ -310,6 +330,72 @@ app.get('/api/dashboard', async (req, res) => {
   hotPicks.sort((a, b) => b.pct - a.pct);
 
   res.json({ empty: false, totalPickers, resultsSet: !!results, categoryStats, playerStats, categoryConsensus, hotPicks });
+});
+
+
+// --- ADMIN ROUTES ---
+
+// Get all players with full pick data
+app.get('/api/admin/players', async (req, res) => {
+  try {
+    const users = await db.users.find({});
+    const picks = await db.picks.find({});
+    const results = await db.results.findOne({ _id: 'official' });
+
+    const picksMap = {};
+    picks.forEach(p => picksMap[p.userId] = p);
+
+    const players = users.map(u => {
+      const p = picksMap[u._id];
+      return {
+        id: u._id,
+        name: u.name,
+        avatar: u.avatar,
+        joinedAt: u.joinedAt,
+        haspicks: !!p,
+        picks: p ? p.picks : null,
+        submittedAt: p ? p.submittedAt : null,
+        updatedAt: p ? p.updatedAt : null,
+      };
+    }).sort((a, b) => new Date(b.joinedAt) - new Date(a.joinedAt));
+
+    res.json({ players, resultsSet: !!results, totalPlayers: players.length, totalWithPicks: players.filter(p => p.haspicks).length });
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
+// Delete a player (removes user + picks)
+app.delete('/api/admin/players/:userId', async (req, res) => {
+  try {
+    const { userId } = req.params;
+    await db.users.remove({ _id: userId }, {});
+    await db.picks.remove({ userId }, {});
+    res.json({ success: true });
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
+// Reset a player's picks only
+app.delete('/api/admin/players/:userId/picks', async (req, res) => {
+  try {
+    const { userId } = req.params;
+    await db.picks.remove({ userId }, {});
+    res.json({ success: true });
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
+// Reset ALL results (unlock picks)
+app.delete('/api/admin/results', async (req, res) => {
+  try {
+    await db.results.remove({ _id: 'official' }, {});
+    res.json({ success: true });
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
 });
 
 // --- Helpers ---

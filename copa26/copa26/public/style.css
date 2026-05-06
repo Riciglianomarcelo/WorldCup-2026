@@ -985,3 +985,201 @@ body {
   .dash-player-row { grid-template-columns: 32px 1fr auto; }
   .completeness-wrap { display: none; }
 }
+
+/* ===========================
+   STICKY SAVE BUTTON
+   =========================== */
+.picks-footer {
+  position: sticky;
+  bottom: 0;
+  background: linear-gradient(to top, var(--bg) 80%, transparent);
+  padding: 20px 0 24px;
+  margin-top: 8px;
+  z-index: 50;
+}
+
+/* ===========================
+   ADMIN PANEL
+   =========================== */
+
+.admin-kpi-row {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(160px, 1fr));
+  gap: 12px;
+  margin-bottom: 28px;
+}
+
+/* Danger zone */
+.admin-danger-zone {
+  background: rgba(255, 23, 68, 0.06);
+  border: 1px solid rgba(255, 23, 68, 0.2);
+  border-radius: 14px;
+  padding: 20px 24px;
+  margin-bottom: 32px;
+}
+
+.danger-title {
+  font-family: var(--font-display);
+  font-size: 16px;
+  color: var(--red);
+  letter-spacing: 1px;
+  margin-bottom: 16px;
+}
+
+.danger-actions { display: flex; flex-direction: column; gap: 12px; }
+
+.danger-item {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 16px;
+  padding: 12px 0;
+  border-bottom: 1px solid rgba(255,23,68,0.1);
+}
+
+.danger-item:last-child { border-bottom: none; padding-bottom: 0; }
+
+.danger-label { font-size: 14px; font-weight: 600; color: var(--text); }
+.danger-desc { font-size: 12px; color: var(--text-muted); margin-top: 3px; }
+
+.btn-danger {
+  background: rgba(255,23,68,0.15);
+  border: 1px solid rgba(255,23,68,0.4);
+  color: var(--red);
+  border-radius: 8px;
+  padding: 9px 16px;
+  font-size: 13px;
+  font-weight: 600;
+  cursor: pointer;
+  white-space: nowrap;
+  transition: all 0.15s;
+  font-family: var(--font-body);
+}
+
+.btn-danger:hover {
+  background: rgba(255,23,68,0.25);
+  border-color: var(--red);
+}
+
+/* Players table */
+.admin-player-row {
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: 12px;
+  padding: 16px 20px;
+  margin-bottom: 8px;
+  display: grid;
+  grid-template-columns: 36px 1fr auto auto auto auto;
+  align-items: center;
+  gap: 16px;
+  animation: slideUp 0.3s ease both;
+  transition: border-color 0.15s;
+}
+
+.admin-player-row:hover { border-color: var(--green-dark); }
+
+.admin-player-row.no-picks {
+  opacity: 0.6;
+  border-style: dashed;
+}
+
+.admin-p-avatar { font-size: 22px; text-align: center; }
+
+.admin-p-info { display: flex; flex-direction: column; gap: 3px; }
+.admin-p-name { font-size: 15px; font-weight: 600; }
+.admin-p-meta { font-size: 11px; color: var(--text-muted); font-family: var(--font-mono); }
+
+.admin-p-badge {
+  font-size: 11px;
+  font-family: var(--font-mono);
+  padding: 4px 10px;
+  border-radius: 6px;
+  white-space: nowrap;
+  text-align: center;
+}
+
+.badge-picks { background: rgba(0,200,83,0.12); color: var(--green); border: 1px solid rgba(0,200,83,0.2); }
+.badge-nopicks { background: rgba(255,167,0,0.1); color: #ffa700; border: 1px solid rgba(255,167,0,0.2); }
+
+.admin-p-joined {
+  font-size: 11px;
+  color: var(--text-muted);
+  font-family: var(--font-mono);
+  white-space: nowrap;
+}
+
+.admin-p-actions { display: flex; gap: 8px; }
+
+.btn-view {
+  background: rgba(0,200,83,0.1);
+  border: 1px solid rgba(0,200,83,0.2);
+  color: var(--green);
+  border-radius: 7px;
+  padding: 7px 12px;
+  font-size: 12px;
+  font-weight: 600;
+  cursor: pointer;
+  transition: all 0.15s;
+  font-family: var(--font-body);
+}
+
+.btn-view:hover { background: rgba(0,200,83,0.2); }
+
+.btn-sm-danger {
+  background: transparent;
+  border: 1px solid rgba(255,23,68,0.25);
+  color: rgba(255,23,68,0.7);
+  border-radius: 7px;
+  padding: 7px 10px;
+  font-size: 12px;
+  cursor: pointer;
+  transition: all 0.15s;
+  font-family: var(--font-body);
+}
+
+.btn-sm-danger:hover {
+  background: rgba(255,23,68,0.1);
+  border-color: var(--red);
+  color: var(--red);
+}
+
+/* Picks detail in admin modal */
+.admin-picks-cat {
+  padding: 12px 0;
+  border-bottom: 1px solid var(--border);
+}
+
+.admin-picks-cat:last-child { border-bottom: none; }
+
+.admin-picks-cat-header {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin-bottom: 8px;
+  font-size: 13px;
+  font-weight: 600;
+}
+
+.admin-picks-positions {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  padding-left: 28px;
+}
+
+.admin-pick-line {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  font-size: 13px;
+  color: var(--text-dim);
+}
+
+@media (max-width: 640px) {
+  .admin-player-row {
+    grid-template-columns: 32px 1fr auto;
+    gap: 10px;
+  }
+  .admin-p-joined, .admin-p-badge { display: none; }
+  .admin-p-actions { flex-direction: column; gap: 4px; }
+}

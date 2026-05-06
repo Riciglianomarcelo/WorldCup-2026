@@ -53,6 +53,7 @@
         <button class="nav-btn" data-tab="leaderboard">Leaderboard</button>
         <button class="nav-btn" data-tab="dashboard">Dashboard</button>
         <button class="nav-btn" data-tab="results">Set Results</button>
+        <button class="nav-btn" data-tab="admin">⚙️ Admin</button>
       </div>
       <div class="nav-user">
         <span id="nav-avatar"></span>
@@ -180,6 +181,66 @@
         </button>
       </div>
     </div>
+
+    <!-- TAB: ADMIN -->
+    <div id="tab-admin" class="tab-content hidden">
+      <div class="tab-header">
+        <h2>Admin <span class="header-sub">— Full control panel</span></h2>
+        <button id="refresh-admin-btn" class="btn-ghost">↻ Refresh</button>
+      </div>
+
+      <!-- KPI row -->
+      <div class="admin-kpi-row" id="admin-kpis"></div>
+
+      <!-- Danger zone -->
+      <div class="admin-danger-zone" id="admin-danger">
+        <div class="danger-title">⚠️ Danger Zone</div>
+        <div class="danger-actions">
+          <div class="danger-item">
+            <div>
+              <div class="danger-label">Reset All Results</div>
+              <div class="danger-desc">Clears the results and unlocks everyone's picks</div>
+            </div>
+            <button id="admin-reset-results-btn" class="btn-danger">Reset Results</button>
+          </div>
+        </div>
+      </div>
+
+      <!-- Players table -->
+      <div class="dash-section">
+        <h3 class="dash-section-title">👥 All Players</h3>
+        <div id="admin-players-list"></div>
+      </div>
+
+      <!-- Confirm modal -->
+      <div id="admin-confirm-modal" class="modal hidden">
+        <div class="modal-backdrop" id="admin-modal-backdrop"></div>
+        <div class="modal-card" style="max-width:420px">
+          <div class="modal-header">
+            <span id="admin-confirm-title">Confirm Action</span>
+            <button id="admin-confirm-close" class="btn-ghost">✕</button>
+          </div>
+          <p id="admin-confirm-msg" style="color:var(--text-dim);font-size:14px;margin-bottom:24px;line-height:1.6"></p>
+          <div style="display:flex;gap:12px;justify-content:flex-end">
+            <button id="admin-confirm-cancel" class="btn-ghost">Cancel</button>
+            <button id="admin-confirm-ok" class="btn-danger">Confirm</button>
+          </div>
+        </div>
+      </div>
+
+      <!-- Player picks detail modal -->
+      <div id="admin-picks-modal" class="modal hidden">
+        <div class="modal-backdrop" id="admin-picks-backdrop"></div>
+        <div class="modal-card">
+          <div class="modal-header">
+            <span id="admin-picks-title"></span>
+            <button id="admin-picks-close" class="btn-ghost">✕</button>
+          </div>
+          <div id="admin-picks-detail"></div>
+        </div>
+      </div>
+    </div>
+
 
   </div>
 
