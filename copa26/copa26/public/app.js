@@ -9,6 +9,178 @@ let resultsData = {};
 let currentLeaderboard = [];
 
 // ===========================
+// JWT TOKEN HELPERS
+// ===========================
+function getToken() { return localStorage.getItem('copa26_token'); }
+function setToken(t) { localStorage.setItem('copa26_token', t); }
+function clearToken() { localStorage.removeItem('copa26_token'); }
+
+function authHeaders() {
+  const t = getToken();
+  return t ? { 'Content-Type': 'application/json', 'Authorization': 'Bearer ' + t }
+           : { 'Content-Type': 'application/json' };
+}
+
+function authFetch(url, opts = {}) {
+  const t = getToken();
+  opts.headers = opts.headers || {};
+  if (t) opts.headers['Authorization'] = 'Bearer ' + t;
+  if (!opts.headers['Content-Type'] && opts.body) opts.headers['Content-Type'] = 'application/json';
+  return fetch(url, opts);
+}
+
+
+// ===========================
+// LANGUAGE SYSTEM
+// ===========================
+let currentLang = localStorage.getItem('copa26_lang') || 'en';
+
+const T = {
+  en: {
+    pick_first: 'Your top pick...', pick_second: 'Your 2nd choice...', pick_third: 'Your 3rd choice...',
+    result_first: 'Actual winner...', result_second: 'Actual 2nd place...', result_third: 'Actual 3rd place...',
+    rank1: '1ST', rank2: '2ND', rank3: '3RD',
+    save_picks: '⚽ Save My Picks', save_results: '🏆 Save Results',
+    saving: '⏳ Saving...', saved_picks: '✅ Picks saved!', saved_results: '✅ Results saved!',
+    locked: '🔒 Results set — picks locked!',
+    lb_points: 'points', lb_waiting: 'waiting', submitted: 'Submitted',
+    unique: 'unique', unique_picks: 'unique', shared: 'shared',
+    no_picks_empty: 'No picks yet — be the first to submit!',
+    no_players: 'No players yet',
+    admin_total: 'Total Players', admin_submitted: 'Picks Submitted',
+    admin_none: 'No Picks Yet', admin_status: 'Status',
+    admin_open: '🟢 Open — picks allowed', admin_locked: '🔒 Locked',
+    admin_picks_in: '✅ picks in', admin_no_picks: '⏳ no picks',
+    admin_joined: 'Joined', admin_picks_label: 'Picks:',
+    admin_updated: 'Updated:', admin_view_picks: 'View Picks',
+    admin_reset_picks: 'Reset Picks', admin_delete: 'Delete',
+    admin_reset_results: 'Reset Results', admin_no_results: 'No Results Set',
+    danger_reset_title: 'Reset All Results',
+    danger_reset_desc: "Clears the results and unlocks everyone's picks",
+    confirm_delete_msg: (name) => `This will permanently remove ${name} and all their picks. Cannot be undone.`,
+    confirm_reset_picks_msg: (name) => `This will clear all of ${name}'s picks. They can re-submit after.`,
+    confirm_reset_results_msg: "This will clear the official results and unlock everyone's picks.",
+    confirm_delete_title: 'Delete Player', confirm_reset_picks_title: 'Reset Picks',
+    confirm_reset_results_title: 'Reset Results', confirm_ok: 'Confirm', confirm_cancel: 'Cancel',
+    maverick: '🎲 maverick', mixed: '🤔 mixed', crowd: '🤝 crowd follower',
+    consensus_label: 'consensus', split_label: 'split', wild_label: 'wild',
+    unique_picks_label: 'unique picks', contrarian_label: 'contrarian', complete_label: '% complete',
+  },
+  es: {
+    pick_first: 'Tu primera opción...', pick_second: 'Tu segunda opción...', pick_third: 'Tu tercera opción...',
+    result_first: 'Ganador real...', result_second: '2do lugar real...', result_third: '3er lugar real...',
+    rank1: '1RO', rank2: '2DO', rank3: '3RO',
+    save_picks: '⚽ Guardar mis Picks', save_results: '🏆 Guardar Resultados',
+    saving: '⏳ Guardando...', saved_picks: '✅ ¡Picks guardados!', saved_results: '✅ ¡Resultados guardados!',
+    locked: '🔒 Resultados ingresados — ¡picks bloqueados!',
+    lb_points: 'puntos', lb_waiting: 'esperando', submitted: 'Enviado',
+    unique: 'únicos', unique_picks: 'únicos', shared: 'compartidos',
+    no_picks_empty: 'Sin picks aún — ¡sé el primero!',
+    no_players: 'Sin jugadores aún',
+    admin_total: 'Total Jugadores', admin_submitted: 'Picks Enviados',
+    admin_none: 'Sin Picks Aún', admin_status: 'Estado',
+    admin_open: '🟢 Abierto — picks permitidos', admin_locked: '🔒 Bloqueado',
+    admin_picks_in: '✅ picks enviados', admin_no_picks: '⏳ sin picks',
+    admin_joined: 'Se unió', admin_picks_label: 'Picks:',
+    admin_updated: 'Actualizado:', admin_view_picks: 'Ver Picks',
+    admin_reset_picks: 'Borrar Picks', admin_delete: 'Eliminar',
+    admin_reset_results: 'Borrar Resultados', admin_no_results: 'Sin Resultados',
+    danger_reset_title: 'Borrar Todos los Resultados',
+    danger_reset_desc: 'Borra los resultados y desbloquea los picks de todos',
+    confirm_delete_msg: (name) => `Esto eliminará permanentemente a ${name} y todos sus picks. No se puede deshacer.`,
+    confirm_reset_picks_msg: (name) => `Esto borrará todos los picks de ${name}. Podrá volver a enviarlos.`,
+    confirm_reset_results_msg: 'Esto borrará los resultados oficiales y desbloqueará los picks de todos.',
+    confirm_delete_title: 'Eliminar Jugador', confirm_reset_picks_title: 'Borrar Picks',
+    confirm_reset_results_title: 'Borrar Resultados', confirm_ok: 'Confirmar', confirm_cancel: 'Cancelar',
+    maverick: '🎲 rebelde', mixed: '🤔 mixto', crowd: '🤝 del montón',
+    consensus_label: 'consenso', split_label: 'dividido', wild_label: 'caos',
+    unique_picks_label: 'picks únicos', contrarian_label: 'contrario', complete_label: '% completo',
+  }
+};
+
+function t(key, ...args) {
+  const val = T[currentLang]?.[key] ?? T.en?.[key] ?? key;
+  return typeof val === 'function' ? val(...args) : val;
+}
+
+function applyLang(lang) {
+  currentLang = lang;
+  localStorage.setItem('copa26_lang', lang);
+
+  // Update all data-en / data-es elements
+  document.querySelectorAll('[data-en], [data-es]').forEach(el => {
+    const val = el.dataset[lang];
+    if (val !== undefined) el.textContent = val;
+  });
+
+  // Update all lang buttons
+  document.querySelectorAll('.lang-btn').forEach(btn => {
+    btn.classList.toggle('active', btn.dataset.lang === lang);
+  });
+
+  // Update dynamic pick card placeholders
+  document.querySelectorAll('[data-pick-pos]').forEach(input => {
+    const pos = input.dataset.pickPos;
+    const isResult = input.dataset.isResult === 'true';
+    const posMap = { first: 0, second: 1, third: 2 };
+    const i = posMap[pos] ?? 0;
+    const placeholders = isResult
+      ? [t('result_first'), t('result_second'), t('result_third')]
+      : [t('pick_first'), t('pick_second'), t('pick_third')];
+    input.placeholder = placeholders[i];
+  });
+}
+
+// Wire lang buttons (all of them — join page + nav)
+document.addEventListener('click', (e) => {
+  const btn = e.target.closest('.lang-btn');
+  if (btn && btn.dataset.lang) applyLang(btn.dataset.lang);
+});
+
+// ===========================
+// THEME SYSTEM
+// ===========================
+let currentTheme = localStorage.getItem('copa26_theme') || 'dark';
+
+function applyTheme(theme) {
+  currentTheme = theme;
+  localStorage.setItem('copa26_theme', theme);
+  document.documentElement.setAttribute('data-theme', theme === 'light' ? 'light' : '');
+  const btn = document.getElementById('theme-toggle');
+  if (btn) btn.textContent = theme === 'light' ? '🌙' : '☀️';
+}
+
+document.addEventListener('DOMContentLoaded', () => {
+  // Apply saved theme on load
+  applyTheme(currentTheme);
+  applyLang(currentLang);
+});
+
+// Theme toggle button
+document.addEventListener('click', (e) => {
+  if (e.target.closest('#theme-toggle')) {
+    applyTheme(currentTheme === 'dark' ? 'light' : 'dark');
+  }
+});
+
+// ===========================
+// WELCOME MODAL
+// ===========================
+function showWelcomeModal() {
+  const modal = document.getElementById('welcome-modal');
+  if (modal) {
+    modal.classList.remove('hidden');
+    applyLang(currentLang); // make sure welcome text is in right language
+  }
+}
+
+document.getElementById('welcome-close-btn')?.addEventListener('click', () => {
+  document.getElementById('welcome-modal')?.classList.add('hidden');
+  // Now enter the app
+  showApp();
+});
+
+// ===========================
 // INIT
 // ===========================
 async function init() {
@@ -16,19 +188,26 @@ async function init() {
   const catRes = await fetch('/api/categories');
   CATEGORIES = await catRes.json();
 
-  // Check session
-  const meRes = await fetch('/api/me');
-  const meData = await meRes.json();
+  // Check token + session
+  const token = getToken();
+  if (token) {
+    try {
+      const meRes = await authFetch('/api/me');
+      const meData = await meRes.json();
+      if (meData.user) {
+        currentUser = meData.user;
+        loadStats();
+        showApp();
+        return;
+      }
+    } catch(e) {}
+    // Token invalid — clear it
+    clearToken();
+  }
 
   // Load stats for join page
   loadStats();
-
-  if (meData.user) {
-    currentUser = meData.user;
-    showApp();
-  } else {
-    showPage('page-join');
-  }
+  showPage('page-join');
 }
 
 // ===========================
@@ -59,18 +238,39 @@ async function joinHandler() {
     const data = await res.json();
 
     if (data.success) {
+      setToken(data.token);
       currentUser = data.user;
-      showApp();
+      btn.innerHTML = '<span>✅ ' + (currentLang === 'es' ? '¡Estás adentro!' : 'You\'re in!') + '</span>';
+      btn.style.background = 'var(--green)';
+      if (data.isNew) {
+        // First time — show welcome modal after brief pause
+        setTimeout(() => showWelcomeModal(), 600);
+      } else {
+        // Returning player — go straight in
+        setTimeout(() => showApp(), 700);
+      }
     } else {
       btn.disabled = false;
       btn.innerHTML = '<span>Let\'s Go</span><span class="btn-icon">→</span>';
-      alert(data.error || 'Something went wrong');
+      showJoinError(data.error || 'Something went wrong');
     }
   } catch (err) {
     btn.disabled = false;
     btn.innerHTML = '<span>Let\'s Go</span><span class="btn-icon">→</span>';
-    alert('Connection error — please try again. (' + err.message + ')');
+    showJoinError('Connection error — ' + err.message);
   }
+}
+
+function showJoinError(msg) {
+  let err = document.getElementById('join-error');
+  if (!err) {
+    err = document.createElement('p');
+    err.id = 'join-error';
+    err.style.cssText = 'color:#ff4444;font-size:13px;font-family:var(--font-mono);margin-top:4px;';
+    document.querySelector('.join-card').appendChild(err);
+  }
+  err.textContent = '⚠️ ' + msg;
+  setTimeout(() => { if (err) err.textContent = ''; }, 5000);
 }
 
 async function loadStats() {
@@ -87,6 +287,8 @@ function showApp() {
   document.getElementById('nav-avatar').textContent = currentUser.avatar || '⚽';
   document.getElementById('nav-name').textContent = currentUser.name;
 
+  applyTheme(currentTheme);
+  applyLang(currentLang);
   showPage('page-app');
   loadPicksTab();
   loadLeaderboard();
@@ -126,9 +328,15 @@ document.querySelectorAll('.nav-btn').forEach(btn => {
 // LOGOUT
 // ===========================
 document.getElementById('logout-btn').addEventListener('click', async () => {
-  await fetch('/api/logout', { method: 'POST' });
+  clearToken();
   currentUser = null;
   myPicks = {};
+  // Reset join form
+  document.getElementById('join-name').value = '';
+  const btn = document.getElementById('join-btn');
+  btn.disabled = false;
+  btn.innerHTML = '<span>Let\'s Go</span><span class="btn-icon">→</span>';
+  btn.style.background = '';
   showPage('page-join');
   loadStats();
 });
@@ -142,7 +350,7 @@ async function loadPicksTab() {
   const resData = await resResult.json();
 
   // Load my picks
-  const picksRes = await fetch('/api/picks/me');
+  const picksRes = await authFetch('/api/picks/me');
   const picksData = await picksRes.json();
   if (picksData.picks) myPicks = picksData.picks;
 
@@ -235,7 +443,7 @@ document.getElementById('save-picks-btn').addEventListener('click', async () => 
   btn.disabled = true;
   btn.innerHTML = '⏳ Saving...';
 
-  const res = await fetch('/api/picks', {
+  const res = await authFetch('/api/picks', {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify({ picks })
@@ -397,7 +605,7 @@ document.getElementById('save-results-btn').addEventListener('click', async () =
   btn.disabled = true;
   btn.innerHTML = '⏳ Saving...';
 
-  const res = await fetch('/api/results', {
+  const res = await authFetch('/api/results', {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify({ results })
@@ -746,7 +954,7 @@ function adminResetPicks(userId, name) {
     'Reset Picks',
     `This will clear all of ${name}'s picks. They can re-submit after. This cannot be undone.`,
     async () => {
-      const res = await fetch(`/api/admin/players/${userId}/picks`, { method: 'DELETE' });
+      const res = await fetch(`/api/admin/players/${userId}/picks`, { method: 'DELETE', headers: { 'Authorization': 'Bearer ' + getToken() } });
       const data = await res.json();
       if (data.success) loadAdmin();
       else alert('Error: ' + data.error);
@@ -760,7 +968,7 @@ function adminDeletePlayer(userId, name) {
     'Delete Player',
     `This will permanently remove ${name} and all their picks from the pool. This cannot be undone.`,
     async () => {
-      const res = await fetch(`/api/admin/players/${userId}`, { method: 'DELETE' });
+      const res = await fetch(`/api/admin/players/${userId}`, { method: 'DELETE', headers: { 'Authorization': 'Bearer ' + getToken() } });
       const data = await res.json();
       if (data.success) loadAdmin();
       else alert('Error: ' + data.error);
@@ -774,7 +982,7 @@ document.getElementById('admin-reset-results-btn').addEventListener('click', () 
     'Reset Results',
     'This will clear the official results and unlock everyone\'s picks so they can be updated again.',
     async () => {
-      const res = await fetch('/api/admin/results', { method: 'DELETE' });
+      const res = await fetch('/api/admin/results', { method: 'DELETE', headers: { 'Authorization': 'Bearer ' + getToken() } });
       const data = await res.json();
       if (data.success) loadAdmin();
       else alert('Error: ' + data.error);

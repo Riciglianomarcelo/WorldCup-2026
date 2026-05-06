@@ -1,5 +1,5 @@
 const express = require('express');
-const session = require('express-session');
+const jwt = require('jsonwebtoken');
 const path = require('path');
 const fs = require('fs');
 const Datastore = require('nedb-promises');
@@ -35,12 +35,18 @@ const db = {
 app.use(express.json());
 app.use(express.urlencoded({ extended: true }));
 app.use(express.static(path.join(__dirname, 'public')));
-app.use(session({
-  secret: process.env.SESSION_SECRET || 'copa26-secret-2026',
-  resave: false,
-  saveUninitialized: false,
-  cookie: { maxAge: 7 * 24 * 60 * 60 * 1000 }
-}));
+// JWT auth middleware — reads Bearer token from Authorization header
+const JWT_SECRET = process.env.SESSION_SECRET || 'copa26-secret-2026';
+app.use((req, res, next) => {
+  req.user = null;
+  const auth = req.headers['authorization'];
+  if (auth && auth.startsWith('Bearer ')) {
+    try {
+      req.user = jwt.verify(auth.slice(7), JWT_SECRET);
+    } catch(e) {}
+  }
+  next();
+});
 
 // --- Categories Config ---
 const CATEGORIES = [
@@ -58,7 +64,7 @@ const SCORING = { first: 3, second: 2, third: 1 };
 
 // --- Auth Middleware ---
 function requireAuth(req, res, next) {
-  if (req.session.userId) return next();
+  if (req.user && req.user.userId) return next();
   res.status(401).json({ error: 'Not logged in' });
 }
 
@@ -75,6 +81,7 @@ app.post('/api/join', async (req, res) => {
 
     const clean = name.trim();
     let user = await db.users.findOne({ nameLower: clean.toLowerCase() });
+    const isNew = !user;
 
     if (!user) {
       user = await db.users.insert({
@@ -85,25 +92,32 @@ app.post('/api/join', async (req, res) => {
       });
     }
 
-    req.session.userId = user._id;
-    req.session.userName = user.name;
-    req.session.save((err) => {
-      if (err) return res.status(500).json({ error: 'Session error: ' + err.message });
-      res.json({ success: true, user: { id: user._id, name: user.name, avatar: user.avatar } });
-    });
+    const token = jwt.sign(
+      { userId: user._id, userName: user.name },
+      JWT_SECRET,
+      { expiresIn: '30d' }
+    );
+    res.json({ success: true, isNew, token, user: { id: user._id, name: user.name, avatar: user.avatar } });
   } catch (err) {
     console.error('Join error:', err);
     res.status(500).json({ error: 'Server error: ' + err.message });
   }
 });
 
-app.get('/api/me', (req, res) => {
-  if (!req.session.userId) return res.json({ user: null });
-  res.json({ user: { id: req.session.userId, name: req.session.userName } });
+app.get('/api/me', async (req, res) => {
+  if (!req.user) return res.json({ user: null });
+  // Re-fetch user from DB to get avatar
+  try {
+    const u = await db.users.findOne({ _id: req.user.userId });
+    if (!u) return res.json({ user: null });
+    res.json({ user: { id: u._id, name: u.name, avatar: u.avatar } });
+  } catch(e) {
+    res.json({ user: null });
+  }
 });
 
 app.post('/api/logout', (req, res) => {
-  req.session.destroy();
+  // JWT is stateless — client just deletes the token
   res.json({ success: true });
 });
 
@@ -117,18 +131,18 @@ app.post('/api/picks', requireAuth, async (req, res) => {
     }
   }
 
-  const existing = await db.picks.findOne({ userId: req.session.userId });
+  const existing = await db.picks.findOne({ userId: req.user.userId });
   const resultsCount = await db.results.count({});
   if (resultsCount > 0 && existing) {
     return res.status(403).json({ error: 'Results have been set — picks are now locked!' });
   }
 
   if (existing) {
-    await db.picks.update({ userId: req.session.userId }, { $set: { picks, updatedAt: new Date().toISOString() } });
+    await db.picks.update({ userId: req.user.userId }, { $set: { picks, updatedAt: new Date().toISOString() } });
   } else {
     await db.picks.insert({
-      userId: req.session.userId,
-      userName: req.session.userName,
+      userId: req.user.userId,
+      userName: req.user.userName,
       picks,
       submittedAt: new Date().toISOString(),
       updatedAt: new Date().toISOString(),
@@ -139,7 +153,7 @@ app.post('/api/picks', requireAuth, async (req, res) => {
 });
 
 app.get('/api/picks/me', requireAuth, async (req, res) => {
-  const myPicks = await db.picks.findOne({ userId: req.session.userId });
+  const myPicks = await db.picks.findOne({ userId: req.user.userId });
   res.json({ picks: myPicks ? myPicks.picks : null });
 });
 
@@ -218,9 +232,9 @@ app.post('/api/results', requireAuth, async (req, res) => {
 
   const existing = await db.results.findOne({ _id: 'official' });
   if (existing) {
-    await db.results.update({ _id: 'official' }, { $set: { data: results, updatedAt: new Date().toISOString(), updatedBy: req.session.userName } });
+    await db.results.update({ _id: 'official' }, { $set: { data: results, updatedAt: new Date().toISOString(), updatedBy: req.user.userName } });
   } else {
-    await db.results.insert({ _id: 'official', data: results, setAt: new Date().toISOString(), setBy: req.session.userName });
+    await db.results.insert({ _id: 'official', data: results, setAt: new Date().toISOString(), setBy: req.user.userName });
   }
 
   res.json({ success: true });

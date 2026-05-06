@@ -3,7 +3,7 @@
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <title>Copa 26 · World Cup Picks</title>
+  <title>Copa 26 · Predicciones / Predictions</title>
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link href="https://fonts.googleapis.com/css2?family=Bebas+Neue&family=Inter:wght@400;500;600;700&family=Space+Mono:wght@400;700&display=swap" rel="stylesheet">
@@ -17,28 +17,55 @@
       <div class="join-noise"></div>
       <div class="stadium-lines"></div>
     </div>
+
+    <!-- Language toggle -->
+    <div class="lang-toggle">
+      <button class="lang-btn active" data-lang="en">🇺🇸 EN</button>
+      <button class="lang-btn" data-lang="es">🇲🇽 ES</button>
+    </div>
+
     <div class="join-content">
       <div class="trophy-icon">🏆</div>
       <div class="title-block">
         <h1 class="logo-text">COPA 26</h1>
-        <p class="logo-sub">World Cup 2026 · Prediction Pool</p>
+        <p class="logo-sub" data-en="World Cup 2026 · Prediction Pool" data-es="Mundial 2026 · Quiniela de Predicciones">World Cup 2026 · Prediction Pool</p>
         <div class="flag-strip">🇺🇸🇨🇦🇲🇽</div>
       </div>
       <div class="join-card">
-        <p class="join-label">Enter your name to join</p>
+        <p class="join-label" data-en="Enter your name to join" data-es="Escribe tu nombre para entrar">Enter your name to join</p>
         <div class="join-input-row">
-          <input type="text" id="join-name" placeholder="Your name..." maxlength="30" autocomplete="off" />
+          <input type="text" id="join-name" placeholder="Your name / Tu nombre..." maxlength="30" autocomplete="off" />
           <button id="join-btn" class="btn-primary">
-            <span>Let's Go</span>
+            <span data-en="Let's Go" data-es="¡Vamos!">Let's Go</span>
             <span class="btn-icon">→</span>
           </button>
         </div>
-        <p class="join-hint">No account needed — just your name</p>
+        <p class="join-hint" data-en="New? Just type your name. Returning? Same name gets you back in." data-es="¿Nuevo? Solo escribe tu nombre. ¿Ya estás? El mismo nombre te regresa.">New? Just type your name. Returning? Same name gets you back in.</p>
       </div>
       <div class="stats-row" id="join-stats">
-        <div class="stat-chip"><span id="stat-players">—</span> players</div>
-        <div class="stat-chip"><span id="stat-picks">—</span> picks submitted</div>
+        <div class="stat-chip"><span id="stat-players">—</span> <span data-en="players" data-es="jugadores">players</span></div>
+        <div class="stat-chip"><span id="stat-picks">—</span> <span data-en="picks submitted" data-es="quinielas enviadas">picks submitted</span></div>
       </div>
+    </div>
+  </div>
+
+  <!-- WELCOME MODAL (shown only on first join) -->
+  <div id="welcome-modal" class="modal hidden">
+    <div class="modal-backdrop"></div>
+    <div class="welcome-card">
+      <div class="welcome-emoji">🎉⚽🏆</div>
+      <h2 class="welcome-title" data-en="Welcome to the most unofficial, unsponsored, and yet somehow the GREATEST World Cup app ever made!" data-es="¡Bienvenido a la app de fútbol más no-oficial, sin patrocinadores, y sin embargo la MÁS ÉPICA del Mundial!">Welcome to the most unofficial, unsponsored, and yet somehow the GREATEST World Cup app ever made!</h2>
+      <p class="welcome-sub" data-en="FIFA doesn't know about this. Let's keep it that way. 🤫" data-es="La FIFA no sabe que esto existe. Mejor así. 🤫">FIFA doesn't know about this. Let's keep it that way. 🤫</p>
+      <div class="welcome-rules">
+        <div class="welcome-rule" data-en="🥇 Pick your winners for 8 categories" data-es="🥇 Elige tus ganadores en 8 categorías">🥇 Pick your winners for 8 categories</div>
+        <div class="welcome-rule" data-en="📊 3 pts for 1st · 2 pts for 2nd · 1 pt for 3rd" data-es="📊 3 pts por 1ro · 2 pts por 2do · 1 pt por 3ro">📊 3 pts for 1st · 2 pts for 2nd · 1 pt for 3rd</div>
+        <div class="welcome-rule" data-en="🏆 Most points at the end wins eternal glory" data-es="🏆 Más puntos al final = gloria eterna">🏆 Most points at the end wins eternal glory</div>
+        <div class="welcome-rule" data-en="🤐 Picks lock when results are set — no cheating!" data-es="🤐 Las quinielas se bloquean al ingresar resultados — ¡nada de trampa!">🤐 Picks lock when results are set — no cheating!</div>
+      </div>
+      <button id="welcome-close-btn" class="btn-primary btn-large" style="margin-top:8px">
+        <span data-en="Let the games begin! ⚽" data-es="¡Que comiencen los juegos! ⚽">Let the games begin! ⚽</span>
+      </button>
+      <p class="welcome-footer" data-en="(You can always come back with the same name)" data-es="(Siempre puedes volver con el mismo nombre)">(You can always come back with the same name)</p>
     </div>
   </div>
 
@@ -49,28 +76,33 @@
     <nav class="nav">
       <div class="nav-logo">⚽ COPA 26</div>
       <div class="nav-links">
-        <button class="nav-btn active" data-tab="picks">My Picks</button>
-        <button class="nav-btn" data-tab="leaderboard">Leaderboard</button>
-        <button class="nav-btn" data-tab="dashboard">Dashboard</button>
-        <button class="nav-btn" data-tab="results">Set Results</button>
-        <button class="nav-btn" data-tab="admin">⚙️ Admin</button>
+        <button class="nav-btn active" data-tab="picks" data-en="My Picks" data-es="Mis Picks">My Picks</button>
+        <button class="nav-btn" data-tab="leaderboard" data-en="Leaderboard" data-es="Tabla">Leaderboard</button>
+        <button class="nav-btn" data-tab="dashboard" data-en="Dashboard" data-es="Dashboard">Dashboard</button>
+        <button class="nav-btn" data-tab="results" data-en="Set Results" data-es="Resultados">Set Results</button>
+        <button class="nav-btn" data-tab="admin" data-en="⚙️ Admin" data-es="⚙️ Admin">⚙️ Admin</button>
       </div>
       <div class="nav-user">
+        <div class="nav-lang">
+          <button class="lang-btn active" data-lang="en">EN</button>
+          <button class="lang-btn" data-lang="es">ES</button>
+        </div>
+        <button id="theme-toggle" class="theme-toggle" title="Toggle theme">🌙</button>
         <span id="nav-avatar"></span>
         <span id="nav-name"></span>
-        <button id="logout-btn" class="btn-ghost">← Out</button>
+        <button id="logout-btn" class="btn-ghost" data-en="← Out" data-es="← Salir">← Out</button>
       </div>
     </nav>
 
     <!-- TAB: MY PICKS -->
     <div id="tab-picks" class="tab-content active">
       <div class="tab-header">
-        <h2>Your Picks <span class="header-sub">— Who's winning what?</span></h2>
+        <h2 data-en="Your Picks" data-es="Tus Picks">Your Picks <span class="header-sub" data-en="— Who's winning what?" data-es="— ¿Quién va a ganar?">— Who's winning what?</span></h2>
         <div id="picks-locked-banner" class="banner banner-warning hidden">
-          🔒 Results are set — picks are locked!
+          <span data-en="🔒 Results are set — picks are locked!" data-es="🔒 Resultados ingresados — ¡picks bloqueados!">🔒 Results are set — picks are locked!</span>
         </div>
         <div id="picks-saved-banner" class="banner banner-success hidden">
-          ✅ Picks saved successfully!
+          <span data-en="✅ Picks saved successfully!" data-es="✅ ¡Picks guardados!">✅ Picks saved successfully!</span>
         </div>
       </div>
 
@@ -80,22 +112,22 @@
 
       <div class="picks-footer">
         <button id="save-picks-btn" class="btn-primary btn-large">
-          <span>⚽ Save My Picks</span>
+          <span data-en="⚽ Save My Picks" data-es="⚽ Guardar mis Picks">⚽ Save My Picks</span>
         </button>
-        <p class="picks-note">You can update your picks until results are set</p>
+        <p class="picks-note"><span data-en="You can update your picks until results are set" data-es="Puedes actualizar tus picks hasta que se ingresen resultados">You can update your picks until results are set</span></p>
       </div>
     </div>
 
     <!-- TAB: LEADERBOARD -->
     <div id="tab-leaderboard" class="tab-content hidden">
       <div class="tab-header">
-        <h2>Leaderboard <span class="header-sub">— Who's the oracle?</span></h2>
-        <button id="refresh-lb-btn" class="btn-ghost">↻ Refresh</button>
+        <h2 data-en="Leaderboard" data-es="Tabla de Posiciones">Leaderboard <span class="header-sub" data-en="— Who's the oracle?" data-es="— ¿Quién lo sabe todo?">— Who's the oracle?</span></h2>
+        <button id="refresh-lb-btn" class="btn-ghost"><span data-en="↻ Refresh" data-es="↻ Actualizar">↻ Refresh</span></button>
       </div>
 
       <div id="leaderboard-empty" class="empty-state hidden">
         <div class="empty-icon">📋</div>
-        <p>No picks submitted yet.<br>Be the first!</p>
+        <p><span data-en="No picks submitted yet." data-es="Nadie ha enviado picks aún.">No picks submitted yet.</span><br><span data-en="Be the first!" data-es="¡Sé el primero!">Be the first!</span></p>
       </div>
 
       <div id="leaderboard-list">
@@ -118,8 +150,8 @@
     <!-- TAB: DASHBOARD -->
     <div id="tab-dashboard" class="tab-content hidden">
       <div class="tab-header">
-        <h2>Dashboard <span class="header-sub">— Stats & insights</span></h2>
-        <button id="refresh-dash-btn" class="btn-ghost">↻ Refresh</button>
+        <h2 data-en="Dashboard" data-es="Dashboard">Dashboard <span class="header-sub" data-en="— Stats &amp; insights" data-es="— Estadísticas">— Stats &amp; insights</span></h2>
+        <button id="refresh-dash-btn" class="btn-ghost"><span data-en="↻ Refresh" data-es="↻ Actualizar">↻ Refresh</span></button>
       </div>
 
       <div id="dash-empty" class="empty-state hidden">
@@ -160,7 +192,7 @@
     <!-- TAB: SET RESULTS -->
     <div id="tab-results" class="tab-content hidden">
       <div class="tab-header">
-        <h2>Set Results <span class="header-sub">— Tournament is over!</span></h2>
+        <h2 data-en="Set Results" data-es="Ingresar Resultados">Set Results <span class="header-sub" data-en="— Tournament is over!" data-es="— ¡Terminó el torneo!">— Tournament is over!</span></h2>
         <div id="results-saved-banner" class="banner banner-success hidden">
           ✅ Results saved! Leaderboard updated.
         </div>
@@ -168,7 +200,7 @@
 
       <div class="results-warning">
         <span>⚠️</span>
-        <p>Once results are set, all picks are locked. Anyone can update results until they're finalized.</p>
+        <p><span data-en="Once results are set, all picks are locked. Anyone can update results until they're finalized." data-es="Una vez ingresados los resultados, los picks se bloquean. Cualquiera puede actualizar hasta que sea definitivo.">Once results are set, all picks are locked. Anyone can update results until they're finalized.</span></p>
       </div>
 
       <div class="results-grid" id="results-grid">
@@ -177,7 +209,7 @@
 
       <div class="picks-footer">
         <button id="save-results-btn" class="btn-primary btn-large">
-          <span>🏆 Save Results</span>
+          <span data-en="🏆 Save Results" data-es="🏆 Guardar Resultados">🏆 Save Results</span>
         </button>
       </div>
     </div>
@@ -185,8 +217,8 @@
     <!-- TAB: ADMIN -->
     <div id="tab-admin" class="tab-content hidden">
       <div class="tab-header">
-        <h2>Admin <span class="header-sub">— Full control panel</span></h2>
-        <button id="refresh-admin-btn" class="btn-ghost">↻ Refresh</button>
+        <h2 data-en="Admin" data-es="Admin">Admin <span class="header-sub" data-en="— Full control panel" data-es="— Panel de control">— Full control panel</span></h2>
+        <button id="refresh-admin-btn" class="btn-ghost"><span data-en="↻ Refresh" data-es="↻ Actualizar">↻ Refresh</span></button>
       </div>
 
       <!-- KPI row -->
