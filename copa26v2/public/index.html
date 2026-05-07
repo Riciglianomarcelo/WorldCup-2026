@@ -1,0 +1,267 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8"/>
+  <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+  <title>RiFiSaRodeOc · Copa 26</title>
+  <link href="https://fonts.googleapis.com/css2?family=Bebas+Neue&family=Inter:wght@400;500;600;700&family=Space+Mono:wght@700&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="style.css">
+</head>
+<body>
+
+<!-- ═══ JOIN PAGE ═══ -->
+<div id="page-join" class="page active">
+  <div class="join-bg"><div class="join-grid"></div></div>
+  <div class="lang-toggle-join">
+    <button class="lang-btn active" data-lang="en">🇺🇸 EN</button>
+    <button class="lang-btn" data-lang="es">🇲🇽 ES</button>
+  </div>
+  <div class="join-content">
+    <div class="trophy-anim">🏆</div>
+    <div class="join-logo">
+  <svg viewBox="0 0 440 90" width="380" role="img" aria-label="RiFiSaRodeOc Copa 26">
+    <circle cx="45" cy="45" r="40" fill="#00962a"/>
+    <circle cx="45" cy="45" r="35" fill="#007a22"/>
+    <polygon points="45,14 55,22 52,34 38,34 35,22" fill="white" opacity="0.92"/>
+    <polygon points="45,76 55,68 52,56 38,56 35,68" fill="white" opacity="0.92"/>
+    <polygon points="18,34 28,26 35,34 28,44 16,49" fill="white" opacity="0.92"/>
+    <polygon points="72,34 62,26 55,34 62,44 74,49" fill="white" opacity="0.92"/>
+    <text x="98"  y="62" font-family="Georgia,serif" font-size="58" font-weight="900" fill="#00C853">Ri</text>
+    <text x="162" y="62" font-family="Georgia,serif" font-size="58" font-weight="900" fill="#FFD700">Fi</text>
+    <text x="228" y="62" font-family="Georgia,serif" font-size="58" font-weight="900" fill="#ffffff">Sa</text>
+    <text x="292" y="62" font-family="Georgia,serif" font-size="58" font-weight="900" fill="#FF6B35">Ro</text>
+    <text x="356" y="62" font-family="Georgia,serif" font-size="58" font-weight="900" fill="#FF69B4">de</text>
+    <text x="408" y="62" font-family="Georgia,serif" font-size="58" font-weight="900" fill="#64B5F6">Oc</text>
+  </svg>
+</div>
+    <p class="logo-sub" data-i18n="tagline">World Cup 2026 · Prediction Pool</p>
+    <div class="flags">🇺🇸🇨🇦🇲🇽</div>
+    <div class="join-card">
+      <p class="join-label" data-i18n="join_label">Enter your name to join</p>
+      <div class="join-row">
+        <input id="join-name" type="text" maxlength="30" autocomplete="off" data-i18n-placeholder="join_placeholder"/>
+        <button id="join-btn" class="btn-green">
+          <span data-i18n="join_btn">Let's Go</span> →
+        </button>
+      </div>
+      <p id="join-error" class="join-error hidden"></p>
+      <p class="join-hint" data-i18n="join_hint">New? Type your name. Returning? Same name gets you back in.</p>
+    </div>
+    <div class="join-stats">
+      <span class="stat-pill"><b id="s-players">—</b> <span data-i18n="players">players</span></span>
+      <span class="stat-pill"><b id="s-awards">—</b> <span data-i18n="awards_submitted">awards picks</span></span>
+      <span class="stat-pill"><b id="s-quiniela">—</b> <span data-i18n="quiniela_submitted">quinielas</span></span>
+    </div>
+  </div>
+</div>
+
+<!-- ═══ WELCOME MODAL ═══ -->
+<div id="welcome-modal" class="modal hidden">
+  <div class="modal-bg"></div>
+  <div class="welcome-box">
+    <div class="welcome-emoji">🎉⚽🏆</div>
+    <h2 data-i18n="welcome_title">Welcome to the most unofficial, unsponsored,<br>and somehow the GREATEST World Cup app ever! 🔥</h2>
+    <p class="welcome-sub" data-i18n="welcome_sub">FIFA doesn't know about this. Let's keep it that way. 🤫</p>
+    <div class="welcome-rules">
+      <div data-i18n="rule1">🏅 <b>Awards</b> — Pick 1st/2nd/3rd for 8 categories (Golden Boot, Champion, etc.)</div>
+      <div data-i18n="rule2">⚽ <b>Quiniela</b> — Predict results for all 104 World Cup games</div>
+      <div data-i18n="rule3">📊 <b>Scoring</b> — Correct winner = 3 pts · Exact score = 5 pts</div>
+      <div data-i18n="rule4">🏆 <b>Win</b> — Most total points = eternal bragging rights</div>
+    </div>
+    <button id="welcome-ok" class="btn-green btn-lg" data-i18n="welcome_btn">Let the games begin! ⚽</button>
+    <p class="welcome-footer" data-i18n="welcome_footer">Come back anytime with the same name</p>
+  </div>
+</div>
+
+<!-- ═══ APP ═══ -->
+<div id="page-app" class="page">
+
+  <nav class="nav">
+    <div class="nav-logo">
+  <svg viewBox="0 0 260 36" height="36" role="img" aria-label="RiFiSaRodeOc Copa 26">
+    <circle cx="18" cy="18" r="16" fill="#00962a"/>
+    <circle cx="18" cy="18" r="14" fill="#007a22"/>
+    <polygon points="18,7 22,11 21,16 15,16 14,11" fill="white" opacity="0.9"/>
+    <polygon points="18,29 22,25 21,20 15,20 14,25" fill="white" opacity="0.9"/>
+    <polygon points="8,16 12,13 15,16 12,19 7,21" fill="white" opacity="0.9"/>
+    <polygon points="28,16 24,13 21,16 24,19 29,21" fill="white" opacity="0.9"/>
+    <text x="40" y="25" font-family="Georgia,serif" font-size="24" font-weight="900" fill="#00C853">Ri</text>
+    <text x="65" y="25" font-family="Georgia,serif" font-size="24" font-weight="900" fill="#FFD700">Fi</text>
+    <text x="91" y="25" font-family="Georgia,serif" font-size="24" font-weight="900" fill="#ffffff">Sa</text>
+    <text x="117" y="25" font-family="Georgia,serif" font-size="24" font-weight="900" fill="#FF6B35">Ro</text>
+    <text x="144" y="25" font-family="Georgia,serif" font-size="24" font-weight="900" fill="#FF69B4">de</text>
+    <text x="168" y="25" font-family="Georgia,serif" font-size="24" font-weight="900" fill="#64B5F6">Oc</text>
+  </svg>
+</div>
+    <div class="nav-tabs" id="nav-tabs">
+      <button class="tab-btn active" data-tab="leaderboard" data-i18n="tab_leaderboard">🏆 Leaderboard</button>
+      <button class="tab-btn" data-tab="awards" data-i18n="tab_awards">⭐ Awards</button>
+      <button class="tab-btn" data-tab="quiniela" data-i18n="tab_quiniela">⚽ Quiniela</button>
+      <button class="tab-btn" data-tab="results" data-i18n="tab_results">📋 Results</button>
+      <button class="tab-btn" data-tab="admin" data-i18n="tab_admin">⚙️ Admin</button>
+    </div>
+    <div class="nav-right">
+      <button class="lang-btn" data-lang="en">EN</button>
+      <button class="lang-btn" data-lang="es">ES</button>
+      <button id="theme-btn" class="icon-btn">🌙</button>
+      <span id="nav-avatar"></span>
+      <span id="nav-name" class="nav-name"></span>
+      <button id="logout-btn" class="btn-ghost" data-i18n="logout">← Out</button>
+    </div>
+  </nav>
+
+  <!-- LEADERBOARD -->
+  <div id="tab-leaderboard" class="tab active">
+    <div class="tab-header">
+      <h2 data-i18n="tab_leaderboard">🏆 Leaderboard</h2>
+      <button onclick="loadLeaderboard()" class="btn-ghost" data-i18n="refresh">↻ Refresh</button>
+    </div>
+    <div id="lb-content"></div>
+  </div>
+
+  <!-- AWARDS PICKS -->
+  <div id="tab-awards" class="tab hidden">
+    <div class="tab-header">
+      <h2 data-i18n="tab_awards">⭐ Awards Picks</h2>
+      <div id="awards-locked-banner" class="banner-warn hidden" data-i18n="locked">🔒 Locked</div>
+    </div>
+    <p class="tab-desc" data-i18n="awards_desc">Pick your 1st, 2nd, and 3rd place for each award. You earn points based on how close your picks are.</p>
+    <div id="awards-grid" class="picks-grid"></div>
+    <div class="sticky-footer">
+      <button id="save-awards-btn" class="btn-green btn-lg" data-i18n="save_awards">⭐ Save Award Picks</button>
+      <p class="footer-note" data-i18n="awards_note">Picks lock when official awards are set</p>
+    </div>
+  </div>
+
+  <!-- QUINIELA -->
+  <div id="tab-quiniela" class="tab hidden">
+    <div class="tab-header">
+      <h2 data-i18n="tab_quiniela">⚽ Quiniela</h2>
+      <div class="quiniela-controls">
+        <select id="phase-filter" class="select-input">
+          <option value="all" data-i18n="all_games">All Games</option>
+          <option value="group" data-i18n="group_stage">Group Stage</option>
+          <option value="r32" data-i18n="round_32">Round of 32</option>
+          <option value="r16" data-i18n="round_16">Round of 16</option>
+          <option value="qf" data-i18n="quarterfinals">Quarter Finals</option>
+          <option value="sf" data-i18n="semifinals">Semi Finals</option>
+          <option value="final" data-i18n="final">Final</option>
+        </select>
+        <select id="group-filter" class="select-input">
+          <option value="all" data-i18n="all_groups">All Groups</option>
+        </select>
+        <button id="save-quiniela-btn" class="btn-green" data-i18n="save_quiniela">⚽ Save Picks</button>
+      </div>
+    </div>
+    <p class="tab-desc" data-i18n="quiniela_desc">Predict the score for every game. Group stage: predict winner (W/D/L) = 3pts. Knockouts: exact score = 5pts, correct winner = 3pts.</p>
+    <div id="quiniela-progress" class="progress-bar-wrap">
+      <div id="quiniela-progress-fill" class="progress-bar-fill" style="width:0%"></div>
+      <span id="quiniela-progress-label" class="progress-label">0 / 104</span>
+    </div>
+    <div id="quiniela-grid" class="quiniela-grid"></div>
+    <div class="sticky-footer">
+      <button id="save-quiniela-btn2" class="btn-green btn-lg" data-i18n="save_quiniela">⚽ Save All Picks</button>
+      <p class="footer-note" data-i18n="quiniela_note">Save often — your picks auto-update</p>
+    </div>
+  </div>
+
+  <!-- SET RESULTS -->
+  <div id="tab-results" class="tab hidden">
+    <div class="tab-header">
+      <h2 data-i18n="tab_results">📋 Set Results</h2>
+    </div>
+    <div class="results-tabs">
+      <button class="res-tab-btn active" data-rtab="awards-results" data-i18n="awards_results">⭐ Award Results</button>
+      <button class="res-tab-btn" data-rtab="quiniela-results" data-i18n="quiniela_results">⚽ Game Results</button>
+    </div>
+
+    <div id="awards-results-panel" class="res-panel">
+      <p class="tab-desc" data-i18n="awards_results_desc">Enter the official award winners. This locks all award picks.</p>
+      <div id="awards-results-grid" class="picks-grid"></div>
+      <div class="sticky-footer">
+        <button id="save-awards-results-btn" class="btn-green btn-lg" data-i18n="save_awards_results">💾 Save Award Results</button>
+      </div>
+    </div>
+
+    <div id="quiniela-results-panel" class="res-panel hidden">
+      <p class="tab-desc" data-i18n="quiniela_results_desc">Enter scores as games finish. You can update anytime.</p>
+      <select id="result-phase-filter" class="select-input" style="margin-bottom:16px">
+        <option value="all">All Games</option>
+        <option value="group">Group Stage</option>
+        <option value="r32">Round of 32</option>
+        <option value="r16">Round of 16</option>
+        <option value="qf">Quarter Finals</option>
+        <option value="sf">Semi Finals</option>
+        <option value="final">Final</option>
+      </select>
+      <div id="quiniela-results-grid" class="quiniela-grid"></div>
+      <div class="sticky-footer">
+        <button id="save-quiniela-results-btn" class="btn-green btn-lg" data-i18n="save_quiniela_results">💾 Save Game Results</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- ADMIN -->
+  <div id="tab-admin" class="tab hidden">
+    <div class="tab-header">
+      <h2 data-i18n="tab_admin">⚙️ Admin</h2>
+      <button onclick="loadAdmin()" class="btn-ghost" data-i18n="refresh">↻ Refresh</button>
+    </div>
+    <div id="admin-kpis" class="kpi-row"></div>
+    <div class="danger-zone">
+      <div class="danger-title">⚠️ <span data-i18n="danger_zone">Danger Zone</span></div>
+      <div class="danger-row">
+        <div>
+          <b data-i18n="reset_awards_results">Reset Award Results</b>
+          <p class="danger-desc" data-i18n="reset_awards_desc">Unlocks all award picks</p>
+        </div>
+        <button id="btn-reset-awards" class="btn-danger" data-i18n="reset">Reset</button>
+      </div>
+      <div class="danger-row">
+        <div>
+          <b data-i18n="reset_quiniela_results">Reset Quiniela Results</b>
+          <p class="danger-desc" data-i18n="reset_quiniela_desc">Clears all game scores</p>
+        </div>
+        <button id="btn-reset-quiniela" class="btn-danger" data-i18n="reset">Reset</button>
+      </div>
+    </div>
+    <!-- KNOCKOUT TEAM EDITOR -->
+    <div class="knockout-editor">
+      <div class="knockout-editor-header">
+        <h3 class="section-title" style="margin:0">⚽ Update Knockout Team Names</h3>
+        <select id="knockout-phase-select" class="select-input">
+          <option value="r32">Round of 32</option>
+          <option value="r16">Round of 16</option>
+          <option value="qf">Quarter Finals</option>
+          <option value="sf">Semi Finals</option>
+          <option value="3rd">Third Place</option>
+          <option value="final">Final</option>
+        </select>
+        <button id="save-knockout-btn" class="btn-green" data-i18n="save_knockout">💾 Save Team Names</button>
+      </div>
+      <p class="tab-desc" style="margin:8px 0 16px" data-i18n="knockout_desc">Update team names as each round's matchups are confirmed. Changes appear instantly for all players.</p>
+      <div id="knockout-teams-grid" class="knockout-grid"></div>
+    </div>
+
+    <h3 class="section-title" data-i18n="all_players">👥 All Players</h3>
+    <div id="admin-players"></div>
+  </div>
+
+</div><!-- end page-app -->
+
+<!-- CONFIRM MODAL -->
+<div id="confirm-modal" class="modal hidden">
+  <div class="modal-bg" onclick="closeConfirm()"></div>
+  <div class="confirm-box">
+    <h3 id="confirm-title"></h3>
+    <p id="confirm-msg"></p>
+    <div class="confirm-btns">
+      <button onclick="closeConfirm()" class="btn-ghost" data-i18n="cancel">Cancel</button>
+      <button id="confirm-ok" class="btn-danger" data-i18n="confirm">Confirm</button>
+    </div>
+  </div>
+</div>
+
+<script src="app.js"></script>
+</body>
+</html>
