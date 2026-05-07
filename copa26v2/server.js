@@ -64,19 +64,20 @@ const AWARD_CATEGORIES = [
 
 // ─── WORLD CUP 2026 FULL SCHEDULE (104 games) ───────────────────────────────
 // Group Stage: 48 games across 12 groups (A-L), 4 teams each
+// Official FIFA World Cup 2026 Groups (drawn December 5, 2025)
 const GROUPS = {
-  A: ['Mexico','Poland','Saudi Arabia','Argentina'],       // placeholder — real draw TBD
-  B: ['USA','England','Iran','Wales'],
-  C: ['France','Australia','Denmark','Tunisia'],
-  D: ['Spain','Costa Rica','Germany','Japan'],
-  E: ['Belgium','Canada','Morocco','Croatia'],
-  F: ['Brazil','Serbia','Switzerland','Cameroon'],
-  G: ['Portugal','Ghana','Uruguay','South Korea'],
-  H: ['Netherlands','Senegal','Ecuador','Qatar'],
-  I: ['Italy','Albania','Colombia','Venezuela'],
-  J: ['Argentina','Chile','Peru','Bolivia'],
-  K: ['Nigeria','Egypt','South Africa','Ivory Coast'],
-  L: ['Australia','New Zealand','Indonesia','Vietnam'],
+  A: ['Mexico', 'South Africa', 'Korea Republic', 'Czechia'],
+  B: ['Canada', 'Bosnia and Herzegovina', 'Qatar', 'Switzerland'],
+  C: ['Brazil', 'Morocco', 'Scotland', 'DR Congo'],
+  D: ['USA', 'Paraguay', 'Australia', 'Turkiye'],
+  E: ['Germany', 'Curacao', 'Ivory Coast', 'Ecuador'],
+  F: ['Netherlands', 'Japan', 'Tunisia', 'Iraq'],
+  G: ['Belgium', 'Egypt', 'Iran', 'Haiti'],
+  H: ['Spain', 'Uruguay', 'Saudi Arabia', 'Cabo Verde'],
+  I: ['France', 'Senegal', 'Norway', 'New Zealand'],
+  J: ['Argentina', 'Algeria', 'Austria', 'Jordan'],
+  K: ['Portugal', 'Colombia', 'Uzbekistan', 'Panama'],
+  L: ['England', 'Croatia', 'Ghana', 'Sweden'],
 };
 
 function buildGroupGames() {
