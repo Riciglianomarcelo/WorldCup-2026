@@ -681,10 +681,43 @@ document.getElementById('save-quiniela-results-btn').addEventListener('click', a
   btn.disabled = false; btn.textContent = t('save_quiniela_results');
 });
 
+// ── SCORE SYNC (admin) ────────────────────────────────────────────────────────
+function fmtSyncStatus(s){
+  if(!s || !s.at) return 'Auto-syncs every 30 min during match days.';
+  const when = new Date(s.at).toLocaleString();
+  if(s.error) return `⚠️ Last sync failed: ${s.error} (${when})`;
+  return `✓ Last sync: ${s.updated} updated · ${s.finishedSeen} finished seen`
+       + (s.skippedManual ? ` · ${s.skippedManual} manual kept` : '')
+       + ` (${when})`;
+}
+async function loadSyncStatus(){
+  const el=document.getElementById('sync-status'); if(!el) return;
+  try{
+    const r=await authFetch('/api/admin/sync/status'); if(!r.ok) return;
+    const s=await r.json();
+    el.textContent=fmtSyncStatus(s);
+    el.className='sync-status'+(s.error?' err':(s.at?' ok':''));
+  }catch(e){}
+}
+document.getElementById('btn-sync-now')?.addEventListener('click', async ()=>{
+  const btn=document.getElementById('btn-sync-now');
+  const el=document.getElementById('sync-status');
+  const orig=btn.textContent; btn.disabled=true; btn.textContent='⏳ Syncing…';
+  try{
+    const r=await authFetch('/api/admin/sync',{method:'POST'});
+    const s=await r.json();
+    if(el){ el.textContent=fmtSyncStatus(s); el.className='sync-status'+(s.error?' err':' ok'); }
+    showToast(s.error ? ('❌ '+s.error) : `✓ Synced — ${s.updated} game${s.updated===1?'':'s'} updated`);
+    if(!s.error && s.updated>0 && typeof loadLeaderboard==='function') loadLeaderboard();
+  }catch(e){ showToast('❌ '+e.message); }
+  btn.disabled=false; btn.textContent=orig;
+});
+
 // ── ADMIN ─────────────────────────────────────────────────────────────────────
 async function loadAdmin() {
   ensureAdminSecret();
   loadKnockoutTeams();
+  loadSyncStatus();
   let res = await authFetch('/api/admin/players');
   if (res.status === 403 || res.status === 503) {
     // wrong/missing secret — clear and ask again once
