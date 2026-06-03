@@ -51,6 +51,16 @@ function requireAuth(req, res, next) {
   res.status(401).json({ error: 'Not logged in' });
 }
 
+// Admin/results/destructive actions require a shared secret (set ADMIN_SECRET in env).
+// The score sync uses this same secret. Fails closed if unset.
+function requireAdmin(req, res, next) {
+  const secret = process.env.ADMIN_SECRET;
+  if (!secret) return res.status(503).json({ error: 'Admin not configured on server' });
+  const provided = req.headers['x-admin-secret'];
+  if (provided && provided === secret) return next();
+  res.status(403).json({ error: 'Admin authorization required' });
+}
+
 // ─── AWARD CATEGORIES ────────────────────────────────────────────────────────
 const AWARD_CATEGORIES = [
   { id: 'golden_boot',    label: 'Golden Boot',        labelEs: 'Bota de Oro',          emoji: '👟', desc: 'Top goal scorer',           descEs: 'Máximo goleador' },
@@ -69,16 +79,16 @@ const AWARD_CATEGORIES = [
 const GROUPS = {
   A: ['Mexico', 'South Africa', 'Korea Republic', 'Czechia'],
   B: ['Canada', 'Bosnia and Herzegovina', 'Qatar', 'Switzerland'],
-  C: ['Brazil', 'Morocco', 'Scotland', 'DR Congo'],
+  C: ['Brazil', 'Morocco', 'Scotland', 'Haiti'],          // corrected: was DR Congo (Dec-draw playoff placeholder)
   D: ['USA', 'Paraguay', 'Australia', 'Turkiye'],
   E: ['Germany', 'Curacao', 'Ivory Coast', 'Ecuador'],
-  F: ['Netherlands', 'Japan', 'Tunisia', 'Iraq'],
-  G: ['Belgium', 'Egypt', 'Iran', 'Haiti'],
+  F: ['Netherlands', 'Japan', 'Tunisia', 'Sweden'],       // corrected: was Iraq
+  G: ['Belgium', 'Egypt', 'Iran', 'New Zealand'],         // corrected: was Haiti
   H: ['Spain', 'Uruguay', 'Saudi Arabia', 'Cabo Verde'],
-  I: ['France', 'Senegal', 'Norway', 'New Zealand'],
+  I: ['France', 'Senegal', 'Norway', 'Iraq'],             // corrected: was New Zealand
   J: ['Argentina', 'Algeria', 'Austria', 'Jordan'],
-  K: ['Portugal', 'Colombia', 'Uzbekistan', 'Panama'],
-  L: ['England', 'Croatia', 'Ghana', 'Sweden'],
+  K: ['Portugal', 'Colombia', 'Uzbekistan', 'DR Congo'],  // corrected: was Panama
+  L: ['England', 'Croatia', 'Ghana', 'Panama'],           // corrected: was Sweden
 };
 
 function buildGroupGames() {
@@ -142,6 +152,95 @@ const KNOCKOUT_GAMES = [
 ];
 
 const ALL_GAMES = [...buildGroupGames(), ...KNOCKOUT_GAMES];
+
+// ─── GROUP-STAGE KICKOFFS (UTC) + home/away orientation vs data source ──────
+// Mapped from openfootball/worldcup.json by group+teams. 'flip' = our home is
+// the data source's away team (used later by the autonomous score sync).
+const GROUP_FIXTURES = {
+  'GS001': { kickoff: '2026-06-11T19:00:00+00:00', flip: false },
+  'GS002': { kickoff: '2026-06-19T01:00:00+00:00', flip: false },
+  'GS003': { kickoff: '2026-06-25T01:00:00+00:00', flip: true },
+  'GS004': { kickoff: '2026-06-25T01:00:00+00:00', flip: false },
+  'GS005': { kickoff: '2026-06-18T16:00:00+00:00', flip: true },
+  'GS006': { kickoff: '2026-06-12T02:00:00+00:00', flip: false },
+  'GS007': { kickoff: '2026-06-12T19:00:00+00:00', flip: false },
+  'GS008': { kickoff: '2026-06-18T22:00:00+00:00', flip: false },
+  'GS009': { kickoff: '2026-06-24T19:00:00+00:00', flip: true },
+  'GS010': { kickoff: '2026-06-24T19:00:00+00:00', flip: false },
+  'GS011': { kickoff: '2026-06-18T19:00:00+00:00', flip: true },
+  'GS012': { kickoff: '2026-06-13T19:00:00+00:00', flip: false },
+  'GS013': { kickoff: '2026-06-13T22:00:00+00:00', flip: false },
+  'GS014': { kickoff: '2026-06-24T22:00:00+00:00', flip: true },
+  'GS015': { kickoff: '2026-06-20T00:30:00+00:00', flip: false },
+  'GS016': { kickoff: '2026-06-19T22:00:00+00:00', flip: true },
+  'GS017': { kickoff: '2026-06-24T22:00:00+00:00', flip: false },
+  'GS018': { kickoff: '2026-06-14T01:00:00+00:00', flip: true },
+  'GS019': { kickoff: '2026-06-13T01:00:00+00:00', flip: false },
+  'GS020': { kickoff: '2026-06-19T19:00:00+00:00', flip: false },
+  'GS021': { kickoff: '2026-06-26T02:00:00+00:00', flip: true },
+  'GS022': { kickoff: '2026-06-26T02:00:00+00:00', flip: false },
+  'GS023': { kickoff: '2026-06-20T03:00:00+00:00', flip: true },
+  'GS024': { kickoff: '2026-06-14T04:00:00+00:00', flip: false },
+  'GS025': { kickoff: '2026-06-14T17:00:00+00:00', flip: false },
+  'GS026': { kickoff: '2026-06-20T20:00:00+00:00', flip: false },
+  'GS027': { kickoff: '2026-06-25T20:00:00+00:00', flip: true },
+  'GS028': { kickoff: '2026-06-25T20:00:00+00:00', flip: false },
+  'GS029': { kickoff: '2026-06-21T00:00:00+00:00', flip: true },
+  'GS030': { kickoff: '2026-06-14T23:00:00+00:00', flip: false },
+  'GS031': { kickoff: '2026-06-14T20:00:00+00:00', flip: false },
+  'GS032': { kickoff: '2026-06-25T23:00:00+00:00', flip: true },
+  'GS033': { kickoff: '2026-06-20T17:00:00+00:00', flip: false },
+  'GS034': { kickoff: '2026-06-21T04:00:00+00:00', flip: true },
+  'GS035': { kickoff: '2026-06-25T23:00:00+00:00', flip: false },
+  'GS036': { kickoff: '2026-06-15T02:00:00+00:00', flip: true },
+  'GS037': { kickoff: '2026-06-15T19:00:00+00:00', flip: false },
+  'GS038': { kickoff: '2026-06-21T19:00:00+00:00', flip: false },
+  'GS039': { kickoff: '2026-06-27T03:00:00+00:00', flip: true },
+  'GS040': { kickoff: '2026-06-27T03:00:00+00:00', flip: false },
+  'GS041': { kickoff: '2026-06-22T01:00:00+00:00', flip: true },
+  'GS042': { kickoff: '2026-06-16T01:00:00+00:00', flip: false },
+  'GS043': { kickoff: '2026-06-27T00:00:00+00:00', flip: true },
+  'GS044': { kickoff: '2026-06-21T16:00:00+00:00', flip: false },
+  'GS045': { kickoff: '2026-06-15T16:00:00+00:00', flip: false },
+  'GS046': { kickoff: '2026-06-15T22:00:00+00:00', flip: true },
+  'GS047': { kickoff: '2026-06-21T22:00:00+00:00', flip: false },
+  'GS048': { kickoff: '2026-06-27T00:00:00+00:00', flip: true },
+  'GS049': { kickoff: '2026-06-16T19:00:00+00:00', flip: false },
+  'GS050': { kickoff: '2026-06-26T19:00:00+00:00', flip: true },
+  'GS051': { kickoff: '2026-06-22T21:00:00+00:00', flip: false },
+  'GS052': { kickoff: '2026-06-23T00:00:00+00:00', flip: true },
+  'GS053': { kickoff: '2026-06-26T19:00:00+00:00', flip: false },
+  'GS054': { kickoff: '2026-06-16T22:00:00+00:00', flip: true },
+  'GS055': { kickoff: '2026-06-17T01:00:00+00:00', flip: false },
+  'GS056': { kickoff: '2026-06-22T17:00:00+00:00', flip: false },
+  'GS057': { kickoff: '2026-06-28T02:00:00+00:00', flip: true },
+  'GS058': { kickoff: '2026-06-28T02:00:00+00:00', flip: false },
+  'GS059': { kickoff: '2026-06-23T03:00:00+00:00', flip: true },
+  'GS060': { kickoff: '2026-06-17T04:00:00+00:00', flip: false },
+  'GS061': { kickoff: '2026-06-27T23:30:00+00:00', flip: true },
+  'GS062': { kickoff: '2026-06-23T17:00:00+00:00', flip: false },
+  'GS063': { kickoff: '2026-06-17T17:00:00+00:00', flip: false },
+  'GS064': { kickoff: '2026-06-18T02:00:00+00:00', flip: true },
+  'GS065': { kickoff: '2026-06-24T02:00:00+00:00', flip: false },
+  'GS066': { kickoff: '2026-06-27T23:30:00+00:00', flip: true },
+  'GS067': { kickoff: '2026-06-17T20:00:00+00:00', flip: false },
+  'GS068': { kickoff: '2026-06-23T20:00:00+00:00', flip: false },
+  'GS069': { kickoff: '2026-06-27T21:00:00+00:00', flip: true },
+  'GS070': { kickoff: '2026-06-27T21:00:00+00:00', flip: false },
+  'GS071': { kickoff: '2026-06-23T23:00:00+00:00', flip: true },
+  'GS072': { kickoff: '2026-06-17T23:00:00+00:00', flip: false },
+};
+// Is this game locked (kickoff has passed)? Group games use GROUP_FIXTURES;
+// games with no known kickoff (knockouts, until mapped) are never locked yet.
+function gameKickoff(gameId) {
+  const f = GROUP_FIXTURES[gameId];
+  return f && f.kickoff ? Date.parse(f.kickoff) : null;
+}
+function isLocked(gameId) {
+  const ko = gameKickoff(gameId);
+  return ko != null && Date.now() >= ko;
+}
+
 
 // ─── SCORING ─────────────────────────────────────────────────────────────────
 // Group stage: predict W/D/L → 3 pts correct, 0 wrong
@@ -228,15 +327,17 @@ app.get('/api/schedule', async (req, res) => {
     const saved = await db.knockout_teams.findOne({ _id: 'knockout' });
     const teamOverrides = saved?.teams || {};
 
-    // Merge overrides into knockout games
+    // Merge overrides into knockout games, and attach kickoff + lock state to all
     const games = ALL_GAMES.map(g => {
-      if (g.phase === 'group') return g;
+      const kickoff = GROUP_FIXTURES[g.id]?.kickoff || null;
+      const locked = isLocked(g.id);
+      if (g.phase === 'group') return { ...g, kickoff, locked };
       const override = teamOverrides[g.id];
-      if (!override) return g;
-      return { ...g, home: override.home || g.home, away: override.away || g.away };
+      const base = override ? { ...g, home: override.home || g.home, away: override.away || g.away } : g;
+      return { ...base, kickoff, locked };
     });
 
-    res.json({ games, total: games.length });
+    res.json({ games, total: games.length, serverTime: new Date().toISOString() });
   } catch(e) {
     res.json({ games: ALL_GAMES, total: ALL_GAMES.length });
   }
@@ -275,14 +376,33 @@ app.get('/api/quiniela/picks/me', requireAuth, async (req, res) => {
 app.post('/api/quiniela/picks', requireAuth, async (req, res) => {
   try {
     const { picks } = req.body; // { gameId: { homeGoals, awayGoals } }
-    if (!picks) return res.status(400).json({ error: 'No picks' });
+    if (!picks || typeof picks !== 'object') return res.status(400).json({ error: 'No picks' });
+
     const existing = await db.quiniela_picks.findOne({ userId: req.user.userId });
-    if (existing) {
-      await db.quiniela_picks.update({ userId: req.user.userId }, { $set: { picks, updatedAt: new Date().toISOString() } });
-    } else {
-      await db.quiniela_picks.insert({ userId: req.user.userId, userName: req.user.userName, picks, submittedAt: new Date().toISOString(), updatedAt: new Date().toISOString() });
+    const current = existing?.picks ? { ...existing.picks } : {};   // start from stored picks
+
+    const rejected = [];   // games the user tried to change after kickoff
+    let applied = 0;
+    for (const [gameId, pick] of Object.entries(picks)) {
+      if (isLocked(gameId)) {
+        // Full stop: a started game is frozen. Only flag if they actually tried to change it.
+        const prev = current[gameId];
+        const changed = !prev
+          || String(prev.homeGoals) !== String(pick.homeGoals)
+          || String(prev.awayGoals) !== String(pick.awayGoals);
+        if (changed) rejected.push(gameId);
+        continue; // never modify a locked game's stored value
+      }
+      current[gameId] = pick;   // merge: only touch submitted, still-open games
+      applied++;
     }
-    res.json({ success: true });
+
+    if (existing) {
+      await db.quiniela_picks.update({ userId: req.user.userId }, { $set: { picks: current, updatedAt: new Date().toISOString() } });
+    } else {
+      await db.quiniela_picks.insert({ userId: req.user.userId, userName: req.user.userName, picks: current, submittedAt: new Date().toISOString(), updatedAt: new Date().toISOString() });
+    }
+    res.json({ success: true, applied, rejected });
   } catch(e) { res.status(500).json({ error: e.message }); }
 });
 
@@ -292,7 +412,7 @@ app.get('/api/quiniela/results', async (req, res) => {
   res.json({ results: r?.data || {} });
 });
 
-app.post('/api/quiniela/results', requireAuth, async (req, res) => {
+app.post('/api/quiniela/results', requireAdmin, async (req, res) => {
   try {
     const { results } = req.body;
     const existing = await db.quiniela_results.findOne({ _id: 'official' });
@@ -311,7 +431,7 @@ app.get('/api/awards/results', async (req, res) => {
   res.json({ results: r?.data || null, resultsSet: !!r });
 });
 
-app.post('/api/awards/results', requireAuth, async (req, res) => {
+app.post('/api/awards/results', requireAdmin, async (req, res) => {
   try {
     const { results } = req.body;
     const existing = await db.awards_results.findOne({ _id: 'official' });
@@ -404,7 +524,7 @@ app.get('/api/stats', async (req, res) => {
 });
 
 // ─── ADMIN ───────────────────────────────────────────────────────────────────
-app.get('/api/admin/players', async (req, res) => {
+app.get('/api/admin/players', requireAdmin, async (req, res) => {
   try {
     const users = await db.users.find({});
     const awardsAll = await db.awards_picks.find({});
@@ -436,7 +556,7 @@ app.get('/api/admin/players', async (req, res) => {
   } catch(e) { res.status(500).json({ error: e.message }); }
 });
 
-app.delete('/api/admin/players/:userId', async (req, res) => {
+app.delete('/api/admin/players/:userId', requireAdmin, async (req, res) => {
   try {
     const { userId } = req.params;
     await db.users.remove({ _id: userId }, {});
@@ -446,22 +566,22 @@ app.delete('/api/admin/players/:userId', async (req, res) => {
   } catch(e) { res.status(500).json({ error: e.message }); }
 });
 
-app.delete('/api/admin/players/:userId/awards', async (req, res) => {
+app.delete('/api/admin/players/:userId/awards', requireAdmin, async (req, res) => {
   try { await db.awards_picks.remove({ userId: req.params.userId }, {}); res.json({ success: true }); }
   catch(e) { res.status(500).json({ error: e.message }); }
 });
 
-app.delete('/api/admin/players/:userId/quiniela', async (req, res) => {
+app.delete('/api/admin/players/:userId/quiniela', requireAdmin, async (req, res) => {
   try { await db.quiniela_picks.remove({ userId: req.params.userId }, {}); res.json({ success: true }); }
   catch(e) { res.status(500).json({ error: e.message }); }
 });
 
-app.delete('/api/admin/results/awards', async (req, res) => {
+app.delete('/api/admin/results/awards', requireAdmin, async (req, res) => {
   try { await db.awards_results.remove({ _id: 'official' }, {}); res.json({ success: true }); }
   catch(e) { res.status(500).json({ error: e.message }); }
 });
 
-app.delete('/api/admin/results/quiniela', async (req, res) => {
+app.delete('/api/admin/results/quiniela', requireAdmin, async (req, res) => {
   try { await db.quiniela_results.remove({ _id: 'official' }, {}); res.json({ success: true }); }
   catch(e) { res.status(500).json({ error: e.message }); }
 });
@@ -475,7 +595,7 @@ app.get('/api/admin/knockout-teams', async (req, res) => {
   } catch(e) { res.status(500).json({ error: e.message }); }
 });
 
-app.post('/api/admin/knockout-teams', requireAuth, async (req, res) => {
+app.post('/api/admin/knockout-teams', requireAdmin, async (req, res) => {
   try {
     const { teams } = req.body; // { gameId: { home, away } }
     if (!teams) return res.status(400).json({ error: 'No teams data' });
@@ -497,4 +617,6 @@ function getAvatar(name) {
   return avatars[Math.abs(hash) % avatars.length];
 }
 
+if (!process.env.SESSION_SECRET) console.warn('⚠️  SESSION_SECRET not set — using insecure fallback. Set it in Railway.');
+if (!process.env.ADMIN_SECRET) console.warn('⚠️  ADMIN_SECRET not set — admin endpoints are disabled until you set it.');
 app.listen(PORT, () => console.log(`⚽ Copa 26 v2 on port ${PORT}`));
