@@ -241,6 +241,79 @@ function isLocked(gameId) {
   return ko != null && Date.now() >= ko;
 }
 
+// ─── AUTONOMOUS SCORE SYNC ──────────────────────────────────────────────────
+// Source-agnostic: swap fetchFinishedResults() to change data providers later.
+const SYNC_SOURCE_URL = process.env.SYNC_SOURCE_URL || 'https://raw.githubusercontent.com/openfootball/worldcup.json/master/2026/worldcup.json';
+
+// data-source spelling -> app spelling
+const SOURCE_TO_APP = {
+  'South Korea': 'Korea Republic', 'Czech Republic': 'Czechia',
+  'Bosnia & Herzegovina': 'Bosnia and Herzegovina', 'Turkey': 'Turkiye',
+  'Curaçao': 'Curacao', 'Cape Verde': 'Cabo Verde',
+};
+const toApp = t => SOURCE_TO_APP[t] || t;
+
+// reverse index: "GROUP|teamA~teamB" (app names, sorted) -> group game object
+const GAME_INDEX = {};
+for (const g of ALL_GAMES) {
+  if (g.phase !== 'group') continue;
+  GAME_INDEX[g.group + '|' + [g.home, g.away].sort().join('~')] = g;
+}
+
+let lastSync = { trigger: 'none', updated: 0, finishedSeen: 0, skippedManual: 0, unmatched: 0, at: null, error: null };
+
+// Returns finished GROUP games from the source as {group, team1, team2, s1, s2}
+async function fetchFinishedResults() {
+  const res = await fetch(SYNC_SOURCE_URL);
+  if (!res.ok) throw new Error('source fetch failed: HTTP ' + res.status);
+  const data = await res.json();
+  const out = [];
+  for (const m of (data.matches || [])) {
+    const grp = String(m.group || '');
+    if (!grp.startsWith('Group')) continue;            // group stage only (for now)
+    const ft = m.score && m.score.ft;                  // openfootball finished-match shape
+    if (!Array.isArray(ft) || ft.length < 2) continue;
+    if (typeof ft[0] !== 'number' || typeof ft[1] !== 'number') continue;
+    out.push({ group: grp.split(' ').pop(), team1: m.team1, team2: m.team2, s1: ft[0], s2: ft[1] });
+  }
+  return out;
+}
+
+// Core sync: write finished scores into quiniela_results. Sync owns; manual overrides stick.
+async function runSync(trigger = 'auto') {
+  const summary = { trigger, updated: 0, finishedSeen: 0, skippedManual: 0, unmatched: 0, at: new Date().toISOString(), error: null };
+  try {
+    const fixtures = await fetchFinishedResults();
+    summary.finishedSeen = fixtures.length;
+    const doc = await db.quiniela_results.findOne({ _id: 'official' });
+    const data = doc?.data ? { ...doc.data } : {};
+
+    for (const f of fixtures) {
+      const t1 = toApp(f.team1), t2 = toApp(f.team2);
+      const game = GAME_INDEX[f.group + '|' + [t1, t2].sort().join('~')];
+      if (!game) { summary.unmatched++; continue; }
+      // orient score to the app's stored home/away
+      const home = (game.home === t1) ? f.s1 : f.s2;
+      const away = (game.home === t1) ? f.s2 : f.s1;
+      const prev = data[game.id];
+      if (prev && prev.source === 'manual') { summary.skippedManual++; continue; }  // don't touch overrides
+      if (prev && +prev.homeGoals === home && +prev.awayGoals === away) continue;    // unchanged
+      data[game.id] = { homeGoals: String(home), awayGoals: String(away), source: 'sync' };
+      summary.updated++;
+    }
+
+    if (summary.updated > 0) {
+      if (doc) await db.quiniela_results.update({ _id: 'official' }, { $set: { data, updatedAt: new Date().toISOString(), updatedBy: 'sync' } });
+      else await db.quiniela_results.insert({ _id: 'official', data, setAt: new Date().toISOString(), setBy: 'sync' });
+    }
+  } catch (e) {
+    summary.error = e.message;
+  }
+  lastSync = summary;
+  console.log('🔄 sync:', JSON.stringify(summary));
+  return summary;
+}
+
 
 // ─── SCORING ─────────────────────────────────────────────────────────────────
 // Group stage: predict W/D/L → 3 pts correct, 0 wrong
@@ -415,13 +488,25 @@ app.get('/api/quiniela/results', async (req, res) => {
 app.post('/api/quiniela/results', requireAdmin, async (req, res) => {
   try {
     const { results } = req.body;
+    if (!results || typeof results !== 'object') return res.status(400).json({ error: 'No results' });
     const existing = await db.quiniela_results.findOne({ _id: 'official' });
-    if (existing) {
-      await db.quiniela_results.update({ _id: 'official' }, { $set: { data: results, updatedBy: req.user.userName, updatedAt: new Date().toISOString() } });
-    } else {
-      await db.quiniela_results.insert({ _id: 'official', data: results, setBy: req.user.userName, setAt: new Date().toISOString() });
+    const data = existing?.data ? { ...existing.data } : {};
+    let set = 0;
+    for (const [gameId, r] of Object.entries(results)) {
+      if (!r) continue;
+      const h = String(r.homeGoals ?? '').trim();
+      const a = String(r.awayGoals ?? '').trim();
+      if (h === '' || a === '') continue;                 // ignore blanks: never wipe a synced score
+      data[gameId] = { homeGoals: h, awayGoals: a, source: 'manual' };  // manual override the sync won't touch
+      set++;
     }
-    res.json({ success: true });
+    const who = req.user?.userName || 'admin';
+    if (existing) {
+      await db.quiniela_results.update({ _id: 'official' }, { $set: { data, updatedBy: who, updatedAt: new Date().toISOString() } });
+    } else {
+      await db.quiniela_results.insert({ _id: 'official', data, setBy: who, setAt: new Date().toISOString() });
+    }
+    res.json({ success: true, set });
   } catch(e) { res.status(500).json({ error: e.message }); }
 });
 
@@ -435,10 +520,11 @@ app.post('/api/awards/results', requireAdmin, async (req, res) => {
   try {
     const { results } = req.body;
     const existing = await db.awards_results.findOne({ _id: 'official' });
+    const who = req.user?.userName || 'admin';
     if (existing) {
-      await db.awards_results.update({ _id: 'official' }, { $set: { data: results, updatedBy: req.user.userName, updatedAt: new Date().toISOString() } });
+      await db.awards_results.update({ _id: 'official' }, { $set: { data: results, updatedBy: who, updatedAt: new Date().toISOString() } });
     } else {
-      await db.awards_results.insert({ _id: 'official', data: results, setBy: req.user.userName, setAt: new Date().toISOString() });
+      await db.awards_results.insert({ _id: 'official', data: results, setBy: who, setAt: new Date().toISOString() });
     }
     res.json({ success: true });
   } catch(e) { res.status(500).json({ error: e.message }); }
@@ -595,15 +681,22 @@ app.get('/api/admin/knockout-teams', async (req, res) => {
   } catch(e) { res.status(500).json({ error: e.message }); }
 });
 
+app.post('/api/admin/sync', requireAdmin, async (req, res) => {
+  const summary = await runSync('manual');
+  res.json({ success: !summary.error, ...summary });
+});
+app.get('/api/admin/sync/status', requireAdmin, async (req, res) => res.json(lastSync));
+
 app.post('/api/admin/knockout-teams', requireAdmin, async (req, res) => {
   try {
     const { teams } = req.body; // { gameId: { home, away } }
     if (!teams) return res.status(400).json({ error: 'No teams data' });
     const existing = await db.knockout_teams.findOne({ _id: 'knockout' });
+    const who = req.user?.userName || 'admin';
     if (existing) {
-      await db.knockout_teams.update({ _id: 'knockout' }, { $set: { teams, updatedBy: req.user.userName, updatedAt: new Date().toISOString() } });
+      await db.knockout_teams.update({ _id: 'knockout' }, { $set: { teams, updatedBy: who, updatedAt: new Date().toISOString() } });
     } else {
-      await db.knockout_teams.insert({ _id: 'knockout', teams, setBy: req.user.userName, setAt: new Date().toISOString() });
+      await db.knockout_teams.insert({ _id: 'knockout', teams, setBy: who, setAt: new Date().toISOString() });
     }
     res.json({ success: true });
   } catch(e) { res.status(500).json({ error: e.message }); }
@@ -619,4 +712,9 @@ function getAvatar(name) {
 
 if (!process.env.SESSION_SECRET) console.warn('⚠️  SESSION_SECRET not set — using insecure fallback. Set it in Railway.');
 if (!process.env.ADMIN_SECRET) console.warn('⚠️  ADMIN_SECRET not set — admin endpoints are disabled until you set it.');
+
+// Autonomous score sync: catch-up shortly after boot, then every 30 minutes.
+setTimeout(() => runSync('startup').catch(e => console.error('sync error', e.message)), 8000);
+setInterval(() => runSync('interval').catch(e => console.error('sync error', e.message)), 30 * 60 * 1000);
+
 app.listen(PORT, () => console.log(`⚽ Copa 26 v2 on port ${PORT}`));
