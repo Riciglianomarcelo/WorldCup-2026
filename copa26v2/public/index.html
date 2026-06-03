@@ -4,38 +4,40 @@
   <meta charset="UTF-8"/>
   <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
   <title>RiFiSaRodeOc · Copa 26</title>
-  <link href="https://fonts.googleapis.com/css2?family=Bebas+Neue&family=Inter:wght@400;500;600;700&family=Space+Mono:wght@700&display=swap" rel="stylesheet">
+  <link href="https://fonts.googleapis.com/css2?family=Bebas+Neue&family=Inter:wght@400;500;600;700&family=Oswald:wght@300;400;600&family=Space+Mono:wght@700&display=swap" rel="stylesheet">
   <link rel="stylesheet" href="style.css">
 </head>
 <body>
 
 <!-- ═══ JOIN PAGE ═══ -->
 <div id="page-join" class="page active">
-  <div class="join-bg"><div class="join-grid"></div></div>
+  <div class="join-bg"><div class="join-grid"></div><div class="join-trionda"></div></div>
   <div class="lang-toggle-join">
     <button class="lang-btn active" data-lang="en">🇺🇸 EN</button>
     <button class="lang-btn" data-lang="es">🇲🇽 ES</button>
   </div>
   <div class="join-content">
-    <div class="trophy-anim">🏆</div>
-    <div class="join-logo">
-  <svg viewBox="0 0 440 90" width="380" role="img" aria-label="RiFiSaRodeOc Copa 26">
-    <circle cx="45" cy="45" r="40" fill="#00962a"/>
-    <circle cx="45" cy="45" r="35" fill="#007a22"/>
-    <polygon points="45,14 55,22 52,34 38,34 35,22" fill="white" opacity="0.92"/>
-    <polygon points="45,76 55,68 52,56 38,56 35,68" fill="white" opacity="0.92"/>
-    <polygon points="18,34 28,26 35,34 28,44 16,49" fill="white" opacity="0.92"/>
-    <polygon points="72,34 62,26 55,34 62,44 74,49" fill="white" opacity="0.92"/>
-    <text x="98"  y="62" font-family="Georgia,serif" font-size="58" font-weight="900" fill="#00C853">Ri</text>
-    <text x="162" y="62" font-family="Georgia,serif" font-size="58" font-weight="900" fill="#FFD700">Fi</text>
-    <text x="228" y="62" font-family="Georgia,serif" font-size="58" font-weight="900" fill="#ffffff">Sa</text>
-    <text x="292" y="62" font-family="Georgia,serif" font-size="58" font-weight="900" fill="#FF6B35">Ro</text>
-    <text x="356" y="62" font-family="Georgia,serif" font-size="58" font-weight="900" fill="#FF69B4">de</text>
-    <text x="408" y="62" font-family="Georgia,serif" font-size="58" font-weight="900" fill="#64B5F6">Oc</text>
-  </svg>
-</div>
-    <p class="logo-sub" data-i18n="tagline">World Cup 2026 · Prediction Pool</p>
-    <div class="flags">🇺🇸🇨🇦🇲🇽</div>
+
+    <!-- ── Tricolor Ring mark ── -->
+    <div class="copa-mark">
+      <svg width="96" height="90" viewBox="0 0 88 84" role="img" aria-label="Copa 26 tricolor ring logo">
+        <path d="M 50.4,9.6 A 37,37 0 0,1 78.8,58.7" fill="none" stroke="#CC2429" stroke-width="5.5" stroke-linecap="round"/>
+        <path d="M 72.3,69.8 A 37,37 0 0,1 15.7,69.8" fill="none" stroke="#1B55B8" stroke-width="5.5" stroke-linecap="round"/>
+        <path d="M 9.2,58.7 A 37,37 0 0,1 37.6,9.6" fill="none" stroke="#00C853" stroke-width="5.5" stroke-linecap="round"/>
+        <circle cx="44" cy="46" r="25" fill="#050e07"/>
+        <text x="44" y="43" text-anchor="middle" dominant-baseline="middle" font-family="'Bebas Neue',sans-serif" font-size="22" fill="#ffffff">26</text>
+        <text x="44" y="61" text-anchor="middle" font-family="'Oswald',sans-serif" font-size="8" fill="#C9A84C" letter-spacing="2">COPA</text>
+      </svg>
+    </div>
+
+    <!-- ── Hero type ── -->
+    <div class="copa-text">COPA</div>
+    <div class="copa-26">26</div>
+    <div class="copa-rule"></div>
+    <div class="copa-name">RiFiSaRodeOc</div>
+    <p class="copa-tagline" data-i18n="tagline">World Cup 2026 · Prediction Pool</p>
+
+    <!-- ── Join card ── -->
     <div class="join-card">
       <p class="join-label" data-i18n="join_label">Enter your name to join</p>
       <div class="join-row">
@@ -47,11 +49,14 @@
       <p id="join-error" class="join-error hidden"></p>
       <p class="join-hint" data-i18n="join_hint">New? Type your name. Returning? Same name gets you back in.</p>
     </div>
+
+    <!-- ── Stats ── -->
     <div class="join-stats">
       <span class="stat-pill"><b id="s-players">—</b> <span data-i18n="players">players</span></span>
       <span class="stat-pill"><b id="s-awards">—</b> <span data-i18n="awards_submitted">awards picks</span></span>
       <span class="stat-pill"><b id="s-quiniela">—</b> <span data-i18n="quiniela_submitted">quinielas</span></span>
     </div>
+
   </div>
 </div>
 
@@ -97,6 +102,7 @@
       <button class="tab-btn active" data-tab="leaderboard" data-i18n="tab_leaderboard">🏆 Leaderboard</button>
       <button class="tab-btn" data-tab="awards" data-i18n="tab_awards">⭐ Awards</button>
       <button class="tab-btn" data-tab="quiniela" data-i18n="tab_quiniela">⚽ Quiniela</button>
+      <button class="tab-btn" data-tab="everyone">👀 Everyone</button>
       <button class="tab-btn" data-tab="results" data-i18n="tab_results">📋 Results</button>
       <button class="tab-btn" data-tab="admin" data-i18n="tab_admin">⚙️ Admin</button>
     </div>
@@ -166,6 +172,16 @@
   </div>
 
   <!-- SET RESULTS -->
+  <div id="tab-everyone" class="tab hidden">
+    <div class="tab-header">
+      <h2>👀 Everyone's Picks</h2>
+      <button onclick="loadEveryone()" class="btn-ghost">↻ Refresh</button>
+    </div>
+    <p class="everyone-hint">Picks reveal the moment each game kicks off. Before that, see who's ready.</p>
+    <div class="ev-filters" id="ev-filters"></div>
+    <div id="everyone-content"></div>
+  </div>
+
   <div id="tab-results" class="tab hidden">
     <div class="tab-header">
       <h2 data-i18n="tab_results">📋 Set Results</h2>
