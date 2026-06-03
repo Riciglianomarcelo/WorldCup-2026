@@ -820,3 +820,16 @@ body { background: var(--bg); color: var(--text); font-family: var(--font); min-
 
 [data-theme="light"] .join-logo svg text[fill="#ffffff"] { fill: #111111; }
 [data-theme="light"] .join-logo svg text[fill="#0a140a"] { fill: #ffffff; }
+
+/* ── Score Sync panel (admin) ───────────────────────────────────────────── */
+.sync-panel{
+  display:flex;align-items:center;justify-content:space-between;gap:16px;
+  background:var(--surface);border:1px solid var(--border);border-radius:var(--radius);
+  padding:16px 20px;margin-bottom:18px;
+}
+.sync-title{font-family:var(--font-d);font-size:16px;color:var(--text);margin-bottom:4px}
+.sync-status{font-size:13px;color:var(--text-2);line-height:1.4}
+.sync-status.ok{color:var(--green)}
+.sync-status.err{color:var(--red)}
+#btn-sync-now{flex:0 0 auto;border-color:var(--green);color:var(--green)}
+#btn-sync-now:disabled{opacity:.55;cursor:not-allowed}
