@@ -160,10 +160,24 @@ const getToken = () => localStorage.getItem('copa26_token');
 const setToken = t => localStorage.setItem('copa26_token', t);
 const clearToken = () => localStorage.removeItem('copa26_token');
 
+// Admin secret (only the organizer enters this; stored locally on their device)
+const getAdminSecret = () => localStorage.getItem('copa26_admin') || '';
+const setAdminSecret = s => localStorage.setItem('copa26_admin', s);
+function ensureAdminSecret() {
+  let s = getAdminSecret();
+  if (!s) {
+    s = (window.prompt('Enter admin secret') || '').trim();
+    if (s) setAdminSecret(s);
+  }
+  return s;
+}
+
 function authFetch(url, opts = {}) {
   const token = getToken();
   opts.headers = opts.headers || {};
   if (token) opts.headers['Authorization'] = 'Bearer ' + token;
+  const adminSecret = getAdminSecret();
+  if (adminSecret) opts.headers['x-admin-secret'] = adminSecret;
   if (opts.body && !opts.headers['Content-Type']) opts.headers['Content-Type'] = 'application/json';
   return fetch(url, opts);
 }
@@ -669,8 +683,19 @@ document.getElementById('save-quiniela-results-btn').addEventListener('click', a
 
 // ── ADMIN ─────────────────────────────────────────────────────────────────────
 async function loadAdmin() {
+  ensureAdminSecret();
   loadKnockoutTeams();
-  const res = await authFetch('/api/admin/players');
+  let res = await authFetch('/api/admin/players');
+  if (res.status === 403 || res.status === 503) {
+    // wrong/missing secret — clear and ask again once
+    localStorage.removeItem('copa26_admin');
+    if (ensureAdminSecret()) res = await authFetch('/api/admin/players');
+  }
+  if (!res.ok) {
+    document.getElementById('admin-players').innerHTML =
+      '<p style="color:var(--text-2)">Admin access denied. Refresh and enter the correct admin secret.</p>';
+    return;
+  }
   const data = await res.json();
 
   // KPIs
