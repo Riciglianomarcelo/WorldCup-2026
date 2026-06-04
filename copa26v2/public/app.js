@@ -1019,6 +1019,19 @@ async function loadSyncStatus(){
     el.className='sync-status'+(s.error?' err':(s.at?' ok':''));
   }catch(e){}
 }
+document.getElementById('btn-test-email')?.addEventListener('click', async () => {
+  const email = window.prompt('Send test email to:', '');
+  if (!email?.includes('@')) return;
+  const btn = document.getElementById('btn-test-email');
+  const orig = btn.textContent; btn.disabled = true; btn.textContent = '⏳ Sending…';
+  try {
+    const r = await authFetch('/api/admin/test-email', { method:'POST', body: JSON.stringify({ to: email }) });
+    const d = await r.json();
+    showToast(d.success ? `✓ Test email sent to ${d.sentTo}` : `❌ ${d.error}`);
+  } catch(e) { showToast('❌ ' + e.message); }
+  btn.disabled = false; btn.textContent = orig;
+});
+
 document.getElementById('btn-sync-now')?.addEventListener('click', async ()=>{
   const btn=document.getElementById('btn-sync-now');
   const el=document.getElementById('sync-status');
