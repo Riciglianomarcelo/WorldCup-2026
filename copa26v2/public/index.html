@@ -95,6 +95,7 @@
     </div>
     <div class="nav-tabs" id="nav-tabs">
       <button class="tab-btn active" data-tab="leaderboard" data-i18n="tab_leaderboard">🏆 Leaderboard</button>
+      <button class="tab-btn" data-tab="race">📈 Race</button>
       <button class="tab-btn" data-tab="awards" data-i18n="tab_awards">⭐ Awards</button>
       <button class="tab-btn" data-tab="quiniela" data-i18n="tab_quiniela">⚽ Quiniela</button>
       <button class="tab-btn" data-tab="everyone">👀 Everyone</button>
@@ -121,6 +122,14 @@
   </div>
 
   <!-- AWARDS PICKS -->
+  <div id="tab-race" class="tab hidden">
+    <div class="tab-header">
+      <h2>📈 Race</h2>
+      <button onclick="loadRace()" class="btn-ghost">↻ Refresh</button>
+    </div>
+    <div id="race-content"></div>
+  </div>
+
   <div id="tab-awards" class="tab hidden">
     <div class="tab-header">
       <h2 data-i18n="tab_awards">⭐ Awards Picks</h2>
