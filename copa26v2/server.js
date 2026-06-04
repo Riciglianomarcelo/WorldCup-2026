@@ -814,6 +814,28 @@ app.get('/api/admin/knockout-teams', async (req, res) => {
   } catch(e) { res.status(500).json({ error: e.message }); }
 });
 
+app.post('/api/admin/test-email', requireAdmin, async (req, res) => {
+  try {
+    const { to } = req.body;
+    if (!to || !to.includes('@')) return res.status(400).json({ error: 'Provide a valid email address' });
+    if (!process.env.GMAIL_USER || !process.env.GMAIL_PASS)
+      return res.status(503).json({ error: 'GMAIL_USER / GMAIL_PASS not set in Railway env vars' });
+    const lb = await quickLeaderboard();
+    const day = new Date().toLocaleDateString('en-US', { month:'short', day:'numeric' });
+    const standingsHtml = `<h2>📊 Standings · ${day}</h2>` +
+      lb.map((p,i) =>
+        `<div class="lbr"><div class="rk">${i+1}</div><div class="nm">${p.avatar} ${p.name}</div><div class="pt">${p.pts} pts</div></div>`
+      ).join('');
+    const testNote = `<div class="banner" style="margin-bottom:12px">🧪 This is a test email — notifications are working!</div>`;
+    await sendEmail({
+      to,
+      subject: `✅ Copa 26 email test — it works!`,
+      html: emailWrap(testNote + standingsHtml),
+    });
+    res.json({ success: true, sentTo: to });
+  } catch(e) { res.status(500).json({ error: e.message }); }
+});
+
 app.post('/api/admin/sync', requireAdmin, async (req, res) => {
   const summary = await runSync('manual');
   res.json({ success: !summary.error, ...summary });
