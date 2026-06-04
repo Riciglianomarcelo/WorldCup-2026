@@ -3,6 +3,7 @@ const jwt = require('jsonwebtoken');
 const path = require('path');
 const fs = require('fs');
 const Datastore = require('nedb-promises');
+const nodemailer = require('nodemailer');
 
 const app = express();
 const PORT = process.env.PORT || 3000;
@@ -32,6 +33,7 @@ const db = {
   quiniela_picks:   Datastore.create({ filename: path.join(DATA_DIR, 'quiniela_picks.db'),   autoload: true }),
   quiniela_results: Datastore.create({ filename: path.join(DATA_DIR, 'quiniela_results.db'), autoload: true }),
   knockout_teams:   Datastore.create({ filename: path.join(DATA_DIR, 'knockout_teams.db'),   autoload: true }),
+  notifications:    Datastore.create({ filename: path.join(DATA_DIR, 'notifications.db'),    autoload: true }),
 };
 
 // ─── MIDDLEWARE ───────────────────────────────────────────────────────────────
@@ -282,6 +284,7 @@ async function fetchFinishedResults() {
 // Core sync: write finished scores into quiniela_results. Sync owns; manual overrides stick.
 async function runSync(trigger = 'auto') {
   const summary = { trigger, updated: 0, finishedSeen: 0, skippedManual: 0, unmatched: 0, at: new Date().toISOString(), error: null };
+  const updatedGames = []; // for notifications
   try {
     const fixtures = await fetchFinishedResults();
     summary.finishedSeen = fixtures.length;
@@ -292,19 +295,24 @@ async function runSync(trigger = 'auto') {
       const t1 = toApp(f.team1), t2 = toApp(f.team2);
       const game = GAME_INDEX[f.group + '|' + [t1, t2].sort().join('~')];
       if (!game) { summary.unmatched++; continue; }
-      // orient score to the app's stored home/away
       const home = (game.home === t1) ? f.s1 : f.s2;
       const away = (game.home === t1) ? f.s2 : f.s1;
       const prev = data[game.id];
-      if (prev && prev.source === 'manual') { summary.skippedManual++; continue; }  // don't touch overrides
-      if (prev && +prev.homeGoals === home && +prev.awayGoals === away) continue;    // unchanged
+      if (prev && prev.source === 'manual') { summary.skippedManual++; continue; }
+      if (prev && +prev.homeGoals === home && +prev.awayGoals === away) continue;
       data[game.id] = { homeGoals: String(home), awayGoals: String(away), source: 'sync' };
+      updatedGames.push({ gameId: game.id, home: game.home, away: game.away, homeGoals: home, awayGoals: away });
       summary.updated++;
     }
 
     if (summary.updated > 0) {
       if (doc) await db.quiniela_results.update({ _id: 'official' }, { $set: { data, updatedAt: new Date().toISOString(), updatedBy: 'sync' } });
       else await db.quiniela_results.insert({ _id: 'official', data, setAt: new Date().toISOString(), setBy: 'sync' });
+
+      // Fire notifications asynchronously — don't block the sync response
+      notifyResults(updatedGames).catch(e => console.error('notify results:', e.message));
+      checkOvertake().catch(e => console.error('notify overtake:', e.message));
+      scheduleDailyLeaderboard();
     }
   } catch (e) {
     summary.error = e.message;
@@ -361,25 +369,25 @@ function scoreAward(pick, result) {
 // ─── AUTH ROUTES ──────────────────────────────────────────────────────────────
 app.post('/api/join', async (req, res) => {
   try {
-    const { name } = req.body;
+    const { name, email } = req.body;
     if (!name || name.trim().length < 2) return res.status(400).json({ error: 'Name too short' });
     const clean = name.trim();
     let user = await db.users.findOne({ nameLower: clean.toLowerCase() });
     const isNew = !user;
     if (!user) {
       user = await db.users.insert({
-        name: clean,
-        nameLower: clean.toLowerCase(),
-        avatar: getAvatar(clean),
-        joinedAt: new Date().toISOString(),
+        name: clean, nameLower: clean.toLowerCase(),
+        avatar: getAvatar(clean), joinedAt: new Date().toISOString(),
       });
     }
+    // Save email if provided and not already set
+    if (email && email.includes('@') && !user.email) {
+      await db.users.update({ _id: user._id }, { $set: { email: email.trim().toLowerCase() } });
+      user.email = email.trim().toLowerCase();
+    }
     const token = jwt.sign({ userId: user._id, userName: user.name }, JWT_SECRET, { expiresIn: '30d' });
-    res.json({ success: true, isNew, token, user: { id: user._id, name: user.name, avatar: user.avatar } });
-  } catch(e) {
-    console.error('Join error:', e);
-    res.status(500).json({ error: e.message });
-  }
+    res.json({ success: true, isNew, token, user: { id: user._id, name: user.name, avatar: user.avatar, hasEmail: !!user.email } });
+  } catch(e) { console.error('Join error:', e); res.status(500).json({ error: e.message }); }
 });
 
 app.get('/api/me', async (req, res) => {
@@ -387,8 +395,26 @@ app.get('/api/me', async (req, res) => {
   try {
     const u = await db.users.findOne({ _id: req.user.userId });
     if (!u) return res.json({ user: null });
-    res.json({ user: { id: u._id, name: u.name, avatar: u.avatar } });
+    res.json({ user: { id: u._id, name: u.name, avatar: u.avatar, hasEmail: !!u.email } });
   } catch(e) { res.json({ user: null }); }
+});
+
+// Save or update email for the logged-in user
+app.post('/api/user/email', requireAuth, async (req, res) => {
+  try {
+    const { email } = req.body;
+    if (!email || !email.includes('@')) return res.status(400).json({ error: 'Invalid email' });
+    await db.users.update({ _id: req.user.userId }, { $set: { email: email.trim().toLowerCase() } });
+    res.json({ success: true });
+  } catch(e) { res.status(500).json({ error: e.message }); }
+});
+
+// Remove email (unsubscribe)
+app.delete('/api/user/email', requireAuth, async (req, res) => {
+  try {
+    await db.users.update({ _id: req.user.userId }, { $unset: { email: true } });
+    res.json({ success: true });
+  } catch(e) { res.status(500).json({ error: e.message }); }
 });
 
 app.post('/api/logout', (req, res) => res.json({ success: true }));
@@ -818,11 +844,220 @@ function getAvatar(name) {
   return avatars[Math.abs(hash) % avatars.length];
 }
 
-if (!process.env.SESSION_SECRET) console.warn('⚠️  SESSION_SECRET not set — using insecure fallback. Set it in Railway.');
+// ─── NOTIFICATION ENGINE ─────────────────────────────────────────────────────
+// Transport: Gmail + App Password.
+// Requires env vars: GMAIL_USER, GMAIL_PASS, APP_URL
+// All notify functions are fire-and-forget — they never crash the main process.
+
+let _mailer = null;
+function getMailer() {
+  if (!_mailer) {
+    _mailer = nodemailer.createTransport({
+      service: 'gmail',
+      auth: { user: process.env.GMAIL_USER, pass: process.env.GMAIL_PASS },
+    });
+  }
+  return _mailer;
+}
+
+async function sendEmail({ to, subject, html }) {
+  const gmailUser = process.env.GMAIL_USER;
+  const gmailPass = process.env.GMAIL_PASS;
+  if (!gmailUser || !gmailPass) return; // silently skip if not configured yet
+  try {
+    const toArr = Array.isArray(to) ? to : [to];
+    const mailOpts = {
+      from: `Copa 26 <${gmailUser}>`,
+      subject, html,
+    };
+    if (toArr.length === 1) {
+      mailOpts.to = toArr[0];
+    } else {
+      // BCC keeps recipients' addresses private from each other
+      mailOpts.to = gmailUser;
+      mailOpts.bcc = toArr.join(', ');
+    }
+    await getMailer().sendMail(mailOpts);
+  } catch(e) { console.error('📧 email error:', e.message); }
+}
+
+async function getEmailRecipients() {
+  const users = await db.users.find({});
+  return users.filter(u => u.email?.includes('@'));
+}
+
+async function notifSent(type, key) {
+  return !!(await db.notifications.findOne({ ntype: type, nkey: key }));
+}
+async function notifMark(type, key) {
+  await db.notifications.insert({ ntype: type, nkey: key, at: new Date().toISOString() });
+}
+
+// Shared leaderboard computation for emails
+async function quickLeaderboard() {
+  const [users, allPicks, qResultsDoc] = await Promise.all([
+    db.users.find({}), db.quiniela_picks.find({}),
+    db.quiniela_results.findOne({ _id: 'official' })
+  ]);
+  const results = qResultsDoc?.data || {};
+  const picksMap = {}; allPicks.forEach(p => { picksMap[p.userId] = p.picks || {}; });
+  const gamePhase = {}; ALL_GAMES.forEach(g => { gamePhase[g.id] = g.phase; });
+  return users.map(u => {
+    let pts = 0;
+    for (const [gid, res] of Object.entries(results))
+      pts += scoreGame(picksMap[u._id]?.[gid], res, gamePhase[gid] || 'group');
+    return { id: u._id, name: u.name, avatar: u.avatar, pts };
+  }).sort((a,b) => b.pts - a.pts);
+}
+
+// Email HTML wrapper — clean, dark, Copa 26 branded
+function emailWrap(content) {
+  const url = process.env.APP_URL || '';
+  return `<!DOCTYPE html><html lang="en"><head><meta charset="UTF-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<style>
+body{margin:0;padding:0;background:#050e07;font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif;color:#eafff0}
+.w{max-width:480px;margin:0 auto;padding:28px 16px}
+.hd{text-align:center;margin-bottom:20px}
+.ht{font-size:26px;font-weight:900;letter-spacing:4px;color:#fff}
+.ht span{color:#00C853}
+.hs{font-size:10px;letter-spacing:3px;color:#3d6b3d;margin-top:3px}
+.card{background:#0e2018;border:1px solid #1d3a2b;border-radius:14px;padding:20px 22px}
+h2{margin:0 0 14px;font-size:19px;color:#fff;font-weight:700}
+.gr{background:#0b1c10;border-radius:10px;padding:12px 16px;margin-bottom:8px;display:flex;align-items:center;justify-content:space-between}
+.tm{font-size:13px;color:#eafff0;font-weight:600}
+.sc{font-size:20px;font-weight:900;color:#C9A84C;min-width:48px;text-align:center}
+.lbr{display:flex;align-items:center;gap:12px;padding:9px 0;border-bottom:1px solid #1d3a2b}
+.lbr:last-child{border-bottom:none}
+.rk{font-size:19px;font-weight:900;color:#C9A84C;width:26px}
+.nm{flex:1;font-size:14px;color:#eafff0}
+.pt{font-size:15px;font-weight:700;color:#00C853}
+.cta{display:block;text-align:center;margin:18px 0 0;background:#00C853;color:#000;
+     text-decoration:none;padding:13px 24px;border-radius:10px;font-weight:700;font-size:15px}
+.ft{font-size:11px;color:#3d6b3d;text-align:center;margin-top:14px;line-height:1.6}
+p{margin:10px 0 0;font-size:13px;color:#7fa389}
+</style></head>
+<body><div class="w">
+<div class="hd">
+  <div class="ht">COPA <span>26</span></div>
+  <div class="hs">WORLD CUP 2026 · PREDICTION POOL</div>
+</div>
+<div class="card">${content}</div>
+${url ? `<a href="${url}" class="cta">📊 View full standings →</a>` : ''}
+<div class="ft">Copa 26 · <a href="${url}" style="color:#3d6b3d">${url}</a><br>You got this because you added your email to Copa 26.</div>
+</div></body></html>`;
+}
+
+// 1. Results email (batched, 1hr cooldown)
+let lastResultsAt = 0;
+async function notifyResults(games) {
+  if (!games.length) return;
+  if (Date.now() - lastResultsAt < 60 * 60 * 1000) return;
+  const recipients = await getEmailRecipients();
+  if (!recipients.length) return;
+  const rows = games.map(g =>
+    `<div class="gr"><div class="tm">${g.home}</div><div class="sc">${g.homeGoals}–${g.awayGoals}</div><div class="tm" style="text-align:right">${g.away}</div></div>`
+  ).join('');
+  await sendEmail({
+    to: recipients.map(u => u.email),
+    subject: `⚽ ${games.length} result${games.length > 1 ? 's' : ''} in — Copa 26`,
+    html: emailWrap(`<h2>⚽ Match results</h2>${rows}`)
+  });
+  lastResultsAt = Date.now();
+  console.log(`📧 results → ${recipients.length} recipients`);
+}
+
+// 2. Daily leaderboard (debounced 30min after last result)
+let dailyTimer = null;
+function scheduleDailyLeaderboard() {
+  if (dailyTimer) clearTimeout(dailyTimer);
+  dailyTimer = setTimeout(async () => {
+    dailyTimer = null;
+    const recipients = await getEmailRecipients();
+    if (!recipients.length) return;
+    const lb = await quickLeaderboard();
+    const rows = lb.map((p,i) =>
+      `<div class="lbr"><div class="rk">${i+1}</div><div class="nm">${p.avatar} ${p.name}</div><div class="pt">${p.pts} pts</div></div>`
+    ).join('');
+    const day = new Date().toLocaleDateString('en-US', { month:'short', day:'numeric' });
+    await sendEmail({
+      to: recipients.map(u => u.email),
+      subject: `📊 Copa 26 standings — ${day}`,
+      html: emailWrap(`<h2>📊 Standings after ${day}</h2>${rows}`)
+    });
+    console.log(`📧 daily leaderboard → ${recipients.length} recipients`);
+  }, 30 * 60 * 1000);
+}
+
+// 3. Overtake alert
+let lastLeaderId = null;
+async function checkOvertake() {
+  const lb = await quickLeaderboard();
+  if (!lb.length || !lb[0].pts) return;
+  const leader = lb[0];
+  if (lastLeaderId && lastLeaderId !== leader.id) {
+    const recipients = await getEmailRecipients();
+    if (recipients.length) {
+      await sendEmail({
+        to: recipients.map(u => u.email),
+        subject: `🏆 ${leader.name} takes the lead! — Copa 26`,
+        html: emailWrap(`
+          <h2>🏆 New leader!</h2>
+          <div class="gr"><div class="nm" style="font-size:18px">${leader.avatar} ${leader.name}</div><div class="sc">${leader.pts}</div></div>
+          <p>has taken the lead in Copa 26!</p>`)
+      });
+      console.log(`📧 overtake → ${leader.name} is leading`);
+    }
+  }
+  lastLeaderId = leader.id;
+}
+
+// 4. Picks-lock reminder (runs every 15 min, sends to players who haven't picked)
+async function notifyLockSoon() {
+  const recipients = await getEmailRecipients();
+  if (!recipients.length) return;
+  const now = Date.now();
+  const upcoming = Object.entries(GROUP_FIXTURES)
+    .map(([gid, f]) => ({ gid, ko: Date.parse(f.kickoff), ...f }))
+    .filter(f => { const diff = f.ko - now; return diff >= 60*60*1000 && diff <= 2.5*60*60*1000; })
+    .map(f => ({ gameId: f.gid, kickoff: f.kickoff, ...ALL_GAMES.find(g => g.id === f.gid) || {} }));
+  if (!upcoming.length) return;
+  const allPicks = await db.quiniela_picks.find({});
+  const picksMap = {}; allPicks.forEach(p => { picksMap[p.userId] = p.picks || {}; });
+  const isFilled = p => p && String(p.homeGoals).trim() !== '' && String(p.awayGoals).trim() !== '';
+  for (const game of upcoming) {
+    for (const u of recipients) {
+      const key = `lock_${game.gameId}_${u._id}`;
+      if (await notifSent('lock', key)) continue;
+      const hasPick = isFilled(picksMap[u._id]?.[game.gameId]);
+      await notifMark('lock', key); // mark regardless — either they have it or we remind once
+      if (hasPick) continue;
+      const ko = new Date(game.kickoff);
+      const timeStr = ko.toLocaleTimeString('en-US', { hour:'2-digit', minute:'2-digit', timeZoneName:'short' });
+      const dateStr = ko.toLocaleDateString('en-US', { month:'short', day:'numeric' });
+      await sendEmail({
+        to: u.email,
+        subject: `🔒 ${game.home} vs ${game.away} locks soon — Copa 26`,
+        html: emailWrap(`
+          <h2>🔒 Pick before it locks!</h2>
+          <div class="gr"><div class="tm">${game.home}</div><div class="sc" style="font-size:13px;color:#7fa389">vs</div><div class="tm" style="text-align:right">${game.away}</div></div>
+          <p>Kicks off ${dateStr} at ${timeStr}. You haven't made your pick yet — the window is closing!</p>`)
+      });
+      console.log(`📧 lock reminder → ${u.name} for ${game.gameId}`);
+    }
+  }
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+
 if (!process.env.ADMIN_SECRET) console.warn('⚠️  ADMIN_SECRET not set — admin endpoints are disabled until you set it.');
+if (!process.env.GMAIL_USER || !process.env.GMAIL_PASS) console.warn('⚠️  GMAIL_USER / GMAIL_PASS not set — email notifications disabled.');
 
 // Autonomous score sync: catch-up shortly after boot, then every 30 minutes.
 setTimeout(() => runSync('startup').catch(e => console.error('sync error', e.message)), 8000);
 setInterval(() => runSync('interval').catch(e => console.error('sync error', e.message)), 30 * 60 * 1000);
+
+// Lock-soon reminders: check every 15 minutes for games kicking off in 1–2.5 hours.
+setInterval(() => notifyLockSoon().catch(e => console.error('lock reminder error', e.message)), 15 * 60 * 1000);
 
 app.listen(PORT, () => console.log(`⚽ Copa 26 v2 on port ${PORT}`));
