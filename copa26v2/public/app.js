@@ -309,8 +309,11 @@ document.getElementById('nav-tabs').addEventListener('click', e => {
   const el = document.getElementById('tab-' + tab);
   el.classList.remove('hidden'); el.classList.add('active');
   if (tab === 'leaderboard') loadLeaderboard();
+  if (tab === 'race') loadRace();
   if (tab === 'admin') loadAdmin();
+  if (tab === 'everyone') loadEveryone();
   if (tab === 'results') { loadAwardsResultsPanel(); loadQuinielaResultsPanel(); }
+  if (tab !== 'race' && racePlaying) { clearInterval(raceTimer); racePlaying = false; }
   if (tab === 'quiniela') renderQuinielaGrid();
   if (tab === 'awards') renderAwardsGrid();
 });
@@ -321,6 +324,187 @@ document.addEventListener('click', e => {
   const btn = e.target.closest('.lang-btn');
   if (btn?.dataset.lang) applyLang(btn.dataset.lang);
 });
+
+// ── RACE CHART ────────────────────────────────────────────────────────────────
+const RACE_COLORS = ['#C9A84C','#00C853','#CC2429','#1B55B8','#FF6B2B','#A78BFA','#38BDF8','#FB7185','#34D399'];
+let raceData = null, raceDayIdx = 0, racePlaying = false, raceTimer = null;
+
+function raceRanks(data, dayIdx) {
+  const sc = data.players.map(p => ({ id:p.id, pts: data.series[p.id]?.[dayIdx] || 0 }));
+  sc.sort((a,b) => b.pts - a.pts || a.id.localeCompare(b.id));
+  const r = {}; sc.forEach((s,i) => r[s.id] = i+1); return r;
+}
+
+async function loadRace() {
+  const el = document.getElementById('race-content');
+  el.innerHTML = '<p style="color:var(--text-2);padding:20px 0">Loading…</p>';
+  try {
+    const res = await fetch('/api/leaderboard/race');
+    raceData = await res.json();
+    if (!raceData.days?.length) { renderRacePreseason(); return; }
+    raceDayIdx = raceData.days.length - 1;
+    renderRaceDay();
+  } catch(e) { el.innerHTML = `<p style="color:var(--red)">${e.message}</p>`; }
+}
+
+function renderRacePreseason() {
+  document.getElementById('race-content').innerHTML = `
+    <div class="race-pre">
+      <div class="race-pre-icon">🏁</div>
+      <div class="race-pre-title">The race begins June 11</div>
+      <div class="race-pre-sub">Once the first games finish and scores sync, every matchday's standings appear here as a live race — who climbed, who fell, who's surging.</div>
+    </div>`;
+}
+
+function setRaceDay(idx) {
+  raceDayIdx = +idx; renderRaceDay();
+  const s = document.getElementById('race-scrub');
+  if (s) s.value = idx;
+}
+
+function raceTogglePlay() {
+  if (racePlaying) {
+    clearInterval(raceTimer); racePlaying = false;
+    const b = document.getElementById('race-play'); if (b) b.textContent = '▶'; return;
+  }
+  racePlaying = true;
+  const b = document.getElementById('race-play'); if (b) b.textContent = '⏸';
+  if (raceDayIdx >= raceData.days.length - 1) raceDayIdx = 0;
+  raceTimer = setInterval(() => {
+    raceDayIdx++;
+    if (raceDayIdx >= raceData.days.length) {
+      clearInterval(raceTimer); racePlaying = false;
+      const b2 = document.getElementById('race-play'); if (b2) b2.textContent = '▶'; return;
+    }
+    renderRaceDay();
+    const s = document.getElementById('race-scrub'); if (s) s.value = raceDayIdx;
+  }, 850);
+}
+
+function renderRaceDay() {
+  if (!raceData?.days?.length) return;
+  const { days, players } = raceData;
+  const di = raceDayIdx;
+  const colorMap = {}; players.forEach((p,i) => colorMap[p.id] = RACE_COLORS[i % RACE_COLORS.length]);
+  const ranks = raceRanks(raceData, di);
+  const prevRanks = di > 0 ? raceRanks(raceData, di-1) : null;
+
+  const withStats = players.map(p => ({
+    ...p, color: colorMap[p.id],
+    pts:   raceData.series[p.id]?.[di] || 0,
+    today: di>0 ? (raceData.series[p.id]?.[di]||0)-(raceData.series[p.id]?.[di-1]||0)
+                : (raceData.series[p.id]?.[0]||0),
+    rank:  ranks[p.id],
+    prevRank: prevRanks ? prevRanks[p.id] : null,
+  })).sort((a,b) => a.rank - b.rank);
+
+  let biggestMover = null, maxClimb = 0;
+  if (prevRanks) withStats.forEach(p => {
+    const climb = (p.prevRank||0) - p.rank;
+    if (climb > maxClimb) { maxClimb = climb; biggestMover = p; }
+  });
+
+  let html = `<div class="race-asof">📅 ${days[di]} · Day ${di+1} of ${days.length}</div>`;
+  html += racePodium(withStats);
+  html += raceBumpChart(raceData, di, colorMap, ranks);
+  html += `<div class="race-controls">
+    <button class="race-play" id="race-play" onclick="raceTogglePlay()">▶</button>
+    <div class="race-slider-wrap">
+      <div class="race-slider-labels"><span>${days[0]}</span><span>drag to replay</span><span>${days[days.length-1]}</span></div>
+      <input type="range" id="race-scrub" min="0" max="${days.length-1}" value="${di}" step="1" oninput="setRaceDay(this.value)">
+    </div>
+  </div>`;
+  html += raceTable(withStats, prevRanks);
+  if (biggestMover) html += `<div class="race-mover-chip">▲ ${biggestMover.name} +${maxClimb} ${maxClimb===1?'place':'places'} today</div>`;
+
+  document.getElementById('race-content').innerHTML = html;
+}
+
+function racePodium(sorted) {
+  const pos = (p, label) => !p ? '' : `<div class="race-pod ${label==='1st'?'race-pod-lead':''}">
+    <div class="race-pod-pos" style="color:${p.color}">${label}</div>
+    <div class="race-pod-av">${p.avatar}</div>
+    <div class="race-pod-name">${p.name}</div>
+    <div class="race-pod-pts" style="color:${p.color}">${p.pts}<span>pts</span></div>
+    <div class="race-pod-today">${p.today>0?'+'+p.today+' today':'—'}</div>
+  </div>`;
+  return `<div class="race-podium">
+    ${pos(sorted[0],'1st')}${pos(sorted[1],'2nd')}${pos(sorted[2],'3rd')}
+  </div>`;
+}
+
+function raceBumpChart(data, di, colorMap, currentRanks) {
+  const { days, players } = data;
+  const N = players.length, M = days.length;
+  const W=780, H=280, PL=40, PR=104, PT=20, PB=32;
+  const xFor = d => M <= 1 ? W/2 : PL + (W-PL-PR) * d / (M-1);
+  const yFor = r => N <= 1 ? H/2 : PT + (H-PT-PB) * (r-1) / (N-1);
+
+  // precompute daily ranks
+  const dailyRanks = days.map((_,d) => raceRanks(data, d));
+
+  let s = `<svg viewBox="0 0 ${W} ${H}" width="100%" style="display:block;overflow:visible">`;
+
+  // gridlines
+  for (let r=1;r<=N;r++) {
+    const y=yFor(r);
+    s += `<line x1="${PL}" y1="${y}" x2="${W-PR}" y2="${y}" style="stroke:var(--border);stroke-width:0.5"/>`;
+    s += `<text x="${PL-8}" y="${y+4}" text-anchor="end" style="font-size:11px;fill:var(--text-3);font-family:var(--font-m)">${r}</text>`;
+  }
+
+  // day labels (every other if crowded)
+  const step = M > 12 ? Math.ceil(M/8) : 1;
+  days.forEach((day,d) => {
+    if (d % step !== 0 && d !== M-1) return;
+    s += `<text x="${xFor(d)}" y="${H-4}" text-anchor="middle" style="font-size:10px;fill:var(--text-3);font-family:var(--font-m)">${day}</text>`;
+  });
+
+  // day marker
+  s += `<line x1="${xFor(di)}" y1="${PT-4}" x2="${xFor(di)}" y2="${H-PB}" style="stroke:#C9A84C;stroke-width:1.5;stroke-dasharray:4 3;opacity:0.6"/>`;
+
+  // player lines (draw non-leaders first so leader is on top)
+  [...players].sort(p => currentRanks[p.id]===1?1:-1).forEach(p => {
+    const color = colorMap[p.id];
+    const isLead = currentRanks[p.id] === 1;
+    const pts = [];
+    for (let d=0; d<=di; d++) {
+      const r = dailyRanks[d]?.[p.id];
+      if (r != null) pts.push([xFor(d), yFor(r)]);
+    }
+    if (!pts.length) return;
+    const pathD = pts.map(([x,y],i) => (i===0?`M${x},${y}`:`L${x},${y}`)).join(' ');
+    s += `<path d="${pathD}" fill="none" stroke="${color}" stroke-width="${isLead?3.5:2.2}" stroke-linejoin="round" stroke-linecap="round" opacity="${isLead?1:0.65}"/>`;
+    const [lx,ly] = pts[pts.length-1];
+    s += `<circle cx="${lx}" cy="${ly}" r="${isLead?5.5:4}" fill="${color}"/>`;
+    const name = p.name.split(' ')[0];
+    s += `<text x="${lx+10}" y="${ly+4}" style="font-size:${isLead?13:11}px;fill:${color};font-weight:${isLead?600:400};font-family:var(--font)">${name}</text>`;
+  });
+
+  s += `</svg>`;
+  return `<div class="race-chart-wrap">${s}</div>`;
+}
+
+function raceTable(sorted, prevRanks) {
+  let html = `<div class="race-table">
+    <div class="race-tr race-thead"><div>Rank</div><div></div><div>Player</div><div class="race-td-r">Today</div><div class="race-td-r">Total</div></div>`;
+  sorted.forEach(p => {
+    let mv = '<span class="race-mv same">—</span>';
+    if (prevRanks) {
+      const diff = (prevRanks[p.id]||0) - p.rank;
+      if (diff > 0) mv = `<span class="race-mv up">▲${diff}</span>`;
+      else if (diff < 0) mv = `<span class="race-mv dn">▼${-diff}</span>`;
+    }
+    html += `<div class="race-tr ${p.rank===1?'race-tr-lead':''}">
+      <div class="race-rk" style="color:${p.rank===1?p.color:'var(--text-2)'}">${p.rank}</div>
+      <div>${mv}</div>
+      <div class="race-player"><span style="margin-right:8px">${p.avatar}</span>${p.name}</div>
+      <div class="race-td-r race-today ${p.today===0?'zero':''}">${p.today>0?'+'+p.today:'0'}</div>
+      <div class="race-td-r race-total">${p.pts}</div>
+    </div>`;
+  });
+  html += `</div>`;
+  return html;
+}
 
 // ── LEADERBOARD ───────────────────────────────────────────────────────────────
 async function loadLeaderboard() {
@@ -680,6 +864,115 @@ document.getElementById('save-quiniela-results-btn').addEventListener('click', a
   } catch(e) { showToast('❌ '+e.message); }
   btn.disabled = false; btn.textContent = t('save_quiniela_results');
 });
+
+// ── EVERYONE'S PICKS (transparency) ───────────────────────────────────────────
+let evData = null;
+let evFilter = 'all';
+
+async function loadEveryone() {
+  const content = document.getElementById('everyone-content');
+  content.innerHTML = '<p style="color:var(--text-2);padding:20px 0">Loading…</p>';
+  try {
+    const res = await authFetch('/api/picks/transparency');
+    if (!res.ok) { content.innerHTML = '<p style="color:var(--red)">Could not load picks.</p>'; return; }
+    evData = await res.json();
+    renderEvFilters();
+    renderEveryone();
+  } catch(e) { content.innerHTML = `<p style="color:var(--red)">${e.message}</p>`; }
+}
+
+function renderEvFilters() {
+  const el = document.getElementById('ev-filters'); if (!el) return;
+  const groups = [...new Set(evData.games.filter(g => g.phase === 'group').map(g => g.group))].sort();
+  let html = `<button class="ev-filter-btn ${evFilter==='all'?'active':''}" onclick="setEvFilter('all')">All</button>`;
+  groups.forEach(g => { html += `<button class="ev-filter-btn ${evFilter===g?'active':''}" onclick="setEvFilter('${g}')">Grp ${g}</button>`; });
+  html += `<button class="ev-filter-btn ${evFilter==='ko'?'active':''}" onclick="setEvFilter('ko')">Knockouts</button>`;
+  el.innerHTML = html;
+}
+
+function setEvFilter(f) { evFilter = f; renderEvFilters(); renderEveryone(); }
+
+function renderEveryone() {
+  const content = document.getElementById('everyone-content'); if (!content || !evData) return;
+  const { players, games } = evData;
+  const fmtKo = ko => ko ? new Date(ko).toLocaleString(undefined, { month:'short', day:'numeric', hour:'2-digit', minute:'2-digit', timeZoneName:'short' }) : 'TBD';
+
+  let filtered = evFilter === 'all' ? games
+    : evFilter === 'ko' ? games.filter(g => g.phase !== 'group')
+    : games.filter(g => g.group === evFilter);
+
+  const locked   = filtered.filter(g => g.locked);
+  const upcoming = filtered.filter(g => !g.locked);
+  let html = '';
+
+  // ── Locked: full picks revealed ──
+  if (locked.length) {
+    html += `<div class="ev-section-head">🔓 Picks Revealed <span class="ev-count">${locked.length}</span></div>`;
+    locked.forEach(g => {
+      html += `<div class="ev-card ev-card-open">`;
+      html += `<div class="ev-card-head">`;
+      html += `<span class="ev-group-badge">${g.phase==='group'?'Group '+g.group:g.id}</span>`;
+      html += `<span class="ev-matchup">${g.home} <span class="ev-vs">vs</span> ${g.away}</span>`;
+      html += g.result
+        ? `<span class="ev-result-badge">⚽ ${g.result.homeGoals}–${g.result.awayGoals}</span>`
+        : `<span class="ev-kickoff">🕐 ${fmtKo(g.kickoff)}</span>`;
+      html += `</div><div class="ev-picks-row">`;
+      players.forEach(p => {
+        const pick = g.playerPicks[p.id];
+        let cls = 'ev-no-pick', label = '—';
+        if (pick) {
+          label = `${pick.homeGoals}–${pick.awayGoals}`; cls = 'ev-has-pick';
+          if (g.result) {
+            const hg = +pick.homeGoals, ag = +pick.awayGoals, rh = +g.result.homeGoals, ra = +g.result.awayGoals;
+            if (hg === rh && ag === ra) cls = 'ev-exact';
+            else { const pw = hg>ag?'H':hg<ag?'A':'D', rw = rh>ra?'H':rh<ra?'A':'D'; cls = pw===rw ? 'ev-correct' : 'ev-wrong'; }
+          }
+        }
+        html += `<div class="ev-player-col"><div class="ev-player-av">${p.avatar}</div>`;
+        html += `<div class="ev-player-name">${p.name.split(' ')[0]}</div>`;
+        html += `<div class="ev-pick-score ${cls}">${label}</div></div>`;
+      });
+      html += `</div></div>`;
+    });
+  }
+
+  // ── Upcoming: submission status only ──
+  if (upcoming.length) {
+    const toShow = evFilter === 'all' ? upcoming.slice(0, 12) : upcoming;
+    html += `<div class="ev-section-head">⏳ Picks Hidden Until Kickoff <span class="ev-count">${upcoming.length}</span></div>`;
+    toShow.forEach(g => {
+      html += `<div class="ev-card"><div class="ev-card-head">`;
+      html += `<span class="ev-group-badge muted">${g.phase==='group'?'Group '+g.group:g.id}</span>`;
+      html += `<span class="ev-matchup">${g.home} <span class="ev-vs">vs</span> ${g.away}</span>`;
+      html += `<span class="ev-kickoff">🔒 ${fmtKo(g.kickoff)}</span>`;
+      html += `</div><div class="ev-submitted-row">`;
+      players.forEach(p => {
+        const sub = g.submitted?.includes(p.id);
+        html += `<div class="ev-sub-player ${sub?'sub-yes':'sub-no'}" title="${p.name}">`;
+        html += `<span class="ev-player-av-sm">${p.avatar}</span>`;
+        html += `<span class="ev-sub-dot">${sub?'✓':'○'}</span></div>`;
+      });
+      html += `</div><p class="ev-hidden-hint">Scores hidden until kickoff</p></div>`;
+    });
+    if (evFilter === 'all' && upcoming.length > 12)
+      html += `<p class="ev-more">+${upcoming.length - 12} more — pick a group filter above to see them</p>`;
+  }
+
+  // ── Placeholder: before tournament starts ──
+  if (!locked.length) {
+    const placeholder = `<div class="ev-placeholder">
+      <div class="ev-placeholder-icon">🔒</div>
+      <div class="ev-placeholder-title">Picks reveal on June 11</div>
+      <div class="ev-placeholder-sub">The moment the first game kicks off, everyone's predictions appear here automatically. Come back after the opening whistle.</div>
+    </div>`;
+    html = placeholder + html;
+  }
+
+  if (!locked.length && !upcoming.length)
+    html = '<p class="ev-empty">No games match this filter.</p>';
+
+  content.innerHTML = html;
+}
 
 // ── SCORE SYNC (admin) ────────────────────────────────────────────────────────
 function fmtSyncStatus(s){
