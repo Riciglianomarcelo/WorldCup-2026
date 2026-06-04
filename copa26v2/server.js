@@ -876,7 +876,13 @@ function getAvatar(name) {
 let _mailer = null;
 function getMailer() {
   if (!_mailer) _mailer = nodemailer.createTransport({
-    service: 'gmail', auth: { user: process.env.GMAIL_USER, pass: process.env.GMAIL_PASS },
+    host: 'smtp.gmail.com',
+    port: 587,
+    secure: false,              // STARTTLS (port 587) — more reliable on cloud servers
+    auth: { user: process.env.GMAIL_USER, pass: process.env.GMAIL_PASS },
+    connectionTimeout: 10000,   // fail fast instead of hanging
+    greetingTimeout:  10000,
+    socketTimeout:    15000,
   });
   return _mailer;
 }
@@ -889,7 +895,10 @@ async function sendEmail({ to, subject, html }) {
     if (toArr.length === 1) { opts.to = toArr[0]; }
     else { opts.to = process.env.GMAIL_USER; opts.bcc = toArr.join(', '); }
     await getMailer().sendMail(opts);
-  } catch(e) { console.error('📧 email error:', e.message); }
+  } catch(e) {
+    console.error('📧 email error:', e.message);
+    _mailer = null; // reset so next attempt gets a fresh connection
+  }
 }
 
 async function getEmailRecipients() {
