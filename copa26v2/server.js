@@ -530,6 +530,114 @@ app.post('/api/awards/results', requireAdmin, async (req, res) => {
   } catch(e) { res.status(500).json({ error: e.message }); }
 });
 
+// ─── TRANSPARENCY: reveal picks once a game locks ────────────────────────────
+// Before kickoff: shows only who has submitted (not the scores).
+// After kickoff: full picks visible to everyone. Includes official result for color-coding.
+app.get('/api/picks/transparency', requireAuth, async (req, res) => {
+  try {
+    const users = await db.users.find({});
+    const allPicks = await db.quiniela_picks.find({});
+    const qResults = await db.quiniela_results.findOne({ _id: 'official' });
+    const results = qResults?.data || {};
+    const picksMap = {};
+    allPicks.forEach(p => { picksMap[p.userId] = p.picks || {}; });
+    const isFilled = p => p && String(p.homeGoals).trim() !== '' && String(p.awayGoals).trim() !== '';
+    const players = users.map(u => ({ id: u._id, name: u.name, avatar: u.avatar }));
+
+    const games = ALL_GAMES.map(g => {
+      const kickoff = GROUP_FIXTURES[g.id]?.kickoff || null;
+      const locked  = isLocked(g.id);
+      const r       = results[g.id];
+      const result  = r ? { homeGoals: r.homeGoals, awayGoals: r.awayGoals } : null;
+      const base    = { id: g.id, home: g.home, away: g.away, group: g.group, phase: g.phase, kickoff, locked, result };
+
+      if (locked) {
+        const playerPicks = {};
+        players.forEach(p => {
+          const pick = picksMap[p.id]?.[g.id];
+          playerPicks[p.id] = isFilled(pick) ? { homeGoals: pick.homeGoals, awayGoals: pick.awayGoals } : null;
+        });
+        return { ...base, playerPicks };
+      } else {
+        // not started: only reveal who has a pick for this specific game (not the scores)
+        const submitted = players
+          .filter(p => isFilled(picksMap[p.id]?.[g.id]))
+          .map(p => p.id);
+        return { ...base, submitted };
+      }
+    });
+
+    res.json({ players, games });
+  } catch(e) { res.status(500).json({ error: e.message }); }
+});
+
+// ─── RACE CHART ──────────────────────────────────────────────────────────────
+// Daily cumulative quiniela scores per player, grouped by calendar day (UTC).
+// Frontend computes ranks and renders the bump chart.
+app.get('/api/leaderboard/race', async (req, res) => {
+  try {
+    const users          = await db.users.find({});
+    const allPicks       = await db.quiniela_picks.find({});
+    const qResultsDoc    = await db.quiniela_results.findOne({ _id: 'official' });
+    const results        = qResultsDoc?.data || {};
+
+    const picksMap = {};
+    allPicks.forEach(p => { picksMap[p.userId] = p.picks || {}; });
+
+    // Sort players by join date so color assignment is stable
+    users.sort((a,b) => (a.joinedAt||'').localeCompare(b.joinedAt||''));
+    const players = users.map(u => ({ id: u._id, name: u.name, avatar: u.avatar }));
+
+    // Collect scored games that have a known kickoff date (group stage)
+    const gamePhaseMap = {};
+    ALL_GAMES.forEach(g => { gamePhaseMap[g.id] = g.phase; });
+
+    const scored = [];
+    for (const [gameId, result] of Object.entries(results)) {
+      const kof = GROUP_FIXTURES[gameId]?.kickoff;
+      if (!kof) continue;
+      const oh = parseInt(result.homeGoals), oa = parseInt(result.awayGoals);
+      if (isNaN(oh) || isNaN(oa)) continue;
+      scored.push({ gameId, day: kof.slice(0, 10), homeGoals: oh, awayGoals: oa,
+                    phase: gamePhaseMap[gameId] || 'group' });
+    }
+    scored.sort((a,b) => a.day.localeCompare(b.day));
+
+    if (!scored.length) {
+      return res.json({ players, days: [], series: {}, message: 'preseason' });
+    }
+
+    // Unique days with at least one result
+    const days = [...new Set(scored.map(g => g.day))].sort();
+
+    // Cumulative scores day by day
+    const cum = {};
+    players.forEach(p => { cum[p.id] = 0; });
+    const series = {};
+    players.forEach(p => { series[p.id] = []; });
+
+    for (const day of days) {
+      for (const g of scored.filter(s => s.day === day)) {
+        for (const player of players) {
+          const pick = picksMap[player.id]?.[g.gameId];
+          cum[player.id] += scoreGame(pick, g, g.phase);
+        }
+      }
+      players.forEach(p => { series[p.id].push(cum[p.id]); });
+    }
+
+    // Human-readable day labels
+    const months = ['','Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'];
+    const dayLabels = days.map(d => {
+      const [,m,dy] = d.split('-');
+      return months[+m] + ' ' + parseInt(dy);
+    });
+
+    res.json({ players, days: dayLabels, series,
+               gamesPerDay: days.map(d => scored.filter(s => s.day === d).length) });
+  } catch(e) { res.status(500).json({ error: e.message }); }
+});
+
 // ─── LEADERBOARD ─────────────────────────────────────────────────────────────
 app.get('/api/leaderboard', async (req, res) => {
   try {
