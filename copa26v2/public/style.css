@@ -948,3 +948,73 @@ body { background: var(--bg); color: var(--text); font-family: var(--font); min-
 .ev-placeholder-icon{font-size:44px;margin-bottom:12px}
 .ev-placeholder-title{font-family:var(--font-d);font-size:22px;color:var(--text);margin-bottom:8px}
 .ev-placeholder-sub{font-size:13px;color:var(--text-2);line-height:1.6;max-width:420px;margin:0 auto}
+
+/* ── Race Chart tab ─────────────────────────────────────────────────────── */
+#race-content { padding-top: 4px; }
+.race-asof { font-family: var(--font-m); font-size: 12px; color: var(--text-2);
+  letter-spacing: 1px; margin-bottom: 16px; }
+
+/* Pre-season placeholder */
+.race-pre { text-align: center; padding: 48px 20px; border: 1px dashed var(--border);
+  border-radius: var(--radius); margin-bottom: 20px; }
+.race-pre-icon  { font-size: 48px; margin-bottom: 14px; }
+.race-pre-title { font-family: var(--font-d); font-size: 24px; color: var(--text); margin-bottom: 10px; }
+.race-pre-sub   { font-size: 13px; color: var(--text-2); line-height: 1.6; max-width: 460px; margin: 0 auto; }
+
+/* Podium */
+.race-podium { display: grid; grid-template-columns: 1.6fr 1fr 1fr; gap: 12px; margin-bottom: 20px; }
+.race-pod { background: var(--surface); border: 1px solid var(--border); border-radius: var(--radius);
+  padding: 16px 18px; display: flex; flex-direction: column; gap: 3px; }
+.race-pod-lead { border-color: var(--gold); background: linear-gradient(160deg,var(--surface2),var(--surface)); }
+.race-pod-pos  { font-size: 11px; font-weight: 700; letter-spacing: 2px; text-transform: uppercase; }
+.race-pod-av   { font-size: 28px; margin: 4px 0; }
+.race-pod-name { font-family: var(--font-d); font-size: 20px; color: var(--text); }
+.race-pod-pts  { font-family: var(--font-d); font-size: 40px; line-height: 1; }
+.race-pod-pts span { font-size: 14px; font-family: var(--font); color: var(--text-2); margin-left: 4px; }
+.race-pod-today { font-size: 12px; font-weight: 700; color: var(--green); }
+
+/* Chart */
+.race-chart-wrap { background: var(--surface); border: 1px solid var(--border);
+  border-radius: var(--radius); padding: 16px 12px 8px; margin-bottom: 14px;
+  overflow-x: auto; }
+
+/* Controls */
+.race-controls { display: flex; align-items: center; gap: 14px; background: var(--surface);
+  border: 1px solid var(--border); border-radius: var(--radius); padding: 12px 16px;
+  margin-bottom: 16px; }
+.race-play { width: 42px; height: 42px; border-radius: 50%; border: none; cursor: pointer;
+  background: var(--green); color: var(--bg); font-size: 16px; display: grid;
+  place-items: center; flex: 0 0 auto; transition: transform .15s; }
+.race-play:hover { transform: scale(1.06); }
+.race-slider-wrap { flex: 1; }
+.race-slider-labels { display: flex; justify-content: space-between; font-size: 10px;
+  color: var(--text-3); letter-spacing: 1px; text-transform: uppercase;
+  font-family: var(--font-m); margin-bottom: 6px; }
+input[type=range]#race-scrub { width: 100%; }
+
+/* Table */
+.race-table { background: var(--surface); border: 1px solid var(--border);
+  border-radius: var(--radius); overflow: hidden; margin-bottom: 12px; }
+.race-tr { display: grid; grid-template-columns: 50px 38px 1fr 80px 80px;
+  align-items: center; padding: 11px 16px; border-bottom: 1px solid var(--border); }
+.race-tr:last-child { border-bottom: none; }
+.race-thead { font-size: 11px; letter-spacing: 1.5px; text-transform: uppercase;
+  color: var(--text-3); font-family: var(--font-m); background: var(--bg2); }
+.race-tr-lead { background: linear-gradient(90deg, rgba(255,215,0,0.08), transparent); }
+.race-rk    { font-family: var(--font-d); font-size: 22px; }
+.race-mv    { font-weight: 800; font-size: 12px; }
+.race-mv.up { color: var(--green); }
+.race-mv.dn { color: var(--red); }
+.race-mv.same { color: var(--text-3); }
+.race-player { display: flex; align-items: center; font-size: 15px; }
+.race-td-r  { text-align: right; }
+.race-today { font-weight: 800; font-size: 14px; color: var(--green); }
+.race-today.zero { color: var(--text-3); }
+.race-total { font-family: var(--font-d); font-size: 22px; color: var(--text); }
+.race-mover-chip { font-size: 12px; font-weight: 700; background: var(--green-d);
+  color: var(--green); border: 1px solid var(--green-d); border-radius: 20px;
+  display: inline-block; padding: 5px 14px; margin-bottom: 8px; letter-spacing: .5px; }
+@media(max-width:680px){
+  .race-podium { grid-template-columns: 1fr; }
+  .race-tr { grid-template-columns: 44px 32px 1fr 64px 64px; padding: 10px 12px; }
+}
