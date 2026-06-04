@@ -6,6 +6,7 @@
   <meta name="apple-mobile-web-app-capable" content="yes"/>
   <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent"/>
   <meta name="theme-color" content="#050e07"/>
+  <link rel="icon" type="image/png" href="/copa26_logo.png"/>
   <title>RiFiSaRodeOc · Copa 26</title>
   <link href="https://fonts.googleapis.com/css2?family=Bebas+Neue&family=Inter:wght@400;500;600;700&family=Oswald:wght@300;400;600&family=Space+Mono:wght@700&display=swap" rel="stylesheet">
   <link rel="stylesheet" href="style.css">
@@ -48,6 +49,9 @@
         <button id="join-btn" class="btn-green">
           <span data-i18n="join_btn">Let's Go</span> →
         </button>
+      </div>
+      <div class="join-email-row">
+        <input id="join-email" type="email" autocomplete="email" placeholder="Email for notifications (optional)"/>
       </div>
       <p id="join-error" class="join-error hidden"></p>
       <p class="join-hint" data-i18n="join_hint">New? Type your name. Returning? Same name gets you back in.</p>
@@ -114,6 +118,16 @@
       <button id="logout-btn" class="btn-ghost" data-i18n="logout">← Out</button>
     </div>
   </nav>
+
+  <!-- Notification email prompt — shown once to logged-in users without email -->
+  <div id="notif-prompt" class="notif-prompt hidden">
+    <span>🔔 Add your email to get game notifications</span>
+    <div class="notif-row">
+      <input id="notif-email" type="email" placeholder="your@email.com" autocomplete="email"/>
+      <button onclick="saveNotifEmail()" class="btn-green">Save</button>
+      <button onclick="dismissNotifPrompt()" class="notif-dismiss">×</button>
+    </div>
+  </div>
 
   <!-- LEADERBOARD -->
   <div id="tab-leaderboard" class="tab active">
