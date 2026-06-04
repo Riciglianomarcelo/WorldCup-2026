@@ -3,7 +3,10 @@
    ═══════════════════════════════ */
 
 /* ── DARK THEME (default) ── */
-:root {
+html {
+  -webkit-text-size-adjust: 100%;
+  text-size-adjust: 100%;
+}
   --green: #00C853;
   --green-d: #009624;
   --green-glow: rgba(0,200,83,0.15);
@@ -72,6 +75,7 @@ body { background: var(--bg); color: var(--text); font-family: var(--font); min-
   align-items: center;
   justify-content: center;
   min-height: 100vh;
+  min-height: 100dvh; /* iOS 15.4+: excludes browser chrome */
   overflow: hidden;
   background: #050e07;
 }
@@ -305,7 +309,7 @@ body { background: var(--bg); color: var(--text); font-family: var(--font); min-
   line-height: 1;
 }
 
-.nav-tabs { display: flex; gap: 2px; flex: 1; overflow-x: auto; }
+.nav-tabs { display: flex; gap: 2px; flex: 1; overflow-x: auto; -webkit-overflow-scrolling: touch; }
 .nav-tabs::-webkit-scrollbar { display: none; }
 
 .tab-btn {
@@ -733,6 +737,7 @@ body { background: var(--bg); color: var(--text); font-family: var(--font); min-
   position: absolute;
   inset: 0;
   background: rgba(0,0,0,.65);
+  -webkit-backdrop-filter: blur(4px);
   backdrop-filter: blur(4px);
 }
 .confirm-box {
@@ -787,16 +792,19 @@ body { background: var(--bg); color: var(--text); font-family: var(--font); min-
 
 /* ═══ RESPONSIVE ═══ */
 @media (max-width: 640px) {
-  .nav { gap: 8px; padding: 0 10px; }
-  .nav-logo { font-size: 16px; }
-  .tab-btn { padding: 6px 10px; font-size: 12px; }
+  .nav { gap: 6px; padding: 0 10px; }
+  .nav-wordmark { display: none; } /* hide wordmark — ring mark alone is enough */
+  .tab-btn { padding: 0 10px; font-size: 12px; height: 44px; } /* 44px = iOS min tap target */
   .nav-name { display: none; }
   .picks-grid { grid-template-columns: 1fr; }
   .lb-row { grid-template-columns: 36px 30px 1fr auto; gap: 8px; padding: 12px 14px; }
   .lb-total { font-size: 24px; }
-  .q-team { font-size: 11px; }
-  .q-score-input { width: 36px; font-size: 14px; }
-  .tab { padding: 16px; }
+  /* Team names: clamp long names in portrait */
+  .q-team { font-size: 11px; max-width: 90px; overflow: hidden;
+            text-overflow: ellipsis; white-space: nowrap; }
+  /* Score inputs: MUST stay ≥16px — iOS Safari zooms the page on any focused input < 16px */
+  .q-score-input { width: 36px; font-size: 16px; padding: 8px 2px; }
+  .tab { padding: 16px 12px; }
 }
 
 /* ═══ SCROLLBAR ═══ */
@@ -1017,4 +1025,54 @@ input[type=range]#race-scrub { width: 100%; }
 @media(max-width:680px){
   .race-podium { grid-template-columns: 1fr; }
   .race-tr { grid-template-columns: 44px 32px 1fr 64px 64px; padding: 10px 12px; }
+}
+
+/* ── iOS Safari & Mobile Compatibility ───────────────────────────────────── */
+
+/* Prevent 300ms tap delay on all interactive elements */
+a, button, input, select, textarea, label, [role="button"] {
+  touch-action: manipulation;
+}
+
+/* Ensure pointer cursor on all clickable elements (iOS doesn't auto-cursor) */
+button, [role="button"], .tab-btn, .btn-green, .btn-ghost, .lang-btn,
+.ev-filter-btn, .race-play { cursor: pointer; }
+
+/* Prevent iOS Safari from auto-styling inputs and buttons */
+input, textarea, select { -webkit-appearance: none; appearance: none; }
+button { -webkit-appearance: none; appearance: none; }
+
+/* Smooth momentum scrolling in scroll containers */
+.nav-tabs, .tab, .quiniela-grid, .race-chart-wrap, .ev-filters {
+  -webkit-overflow-scrolling: touch;
+}
+
+/* Safe area insets for iPhone X+ notch and home indicator */
+.nav {
+  padding-left: max(16px, env(safe-area-inset-left));
+  padding-right: max(16px, env(safe-area-inset-right));
+}
+.tab {
+  padding-bottom: max(24px, env(safe-area-inset-bottom));
+}
+
+/* Fix: inputs must be ≥16px font-size to prevent iOS auto-zoom.
+   This rule catches any we missed above. */
+@media (max-width: 768px) {
+  input[type="text"], input[type="number"], input[type="email"],
+  input[type="password"], textarea, select {
+    font-size: max(16px, 1em) !important;
+  }
+}
+
+/* iOS Safari: race chart and everyone chart horizontal scroll */
+@media (max-width: 640px) {
+  .race-chart-wrap { padding: 12px 6px 4px; }
+  .race-podium { grid-template-columns: 1fr; }
+  .race-tr { grid-template-columns: 40px 30px 1fr 60px 60px; padding: 10px 10px; }
+  .race-rk { font-size: 18px; }
+  .race-total { font-size: 18px; }
+  /* Stack ev-card head on mobile */
+  .ev-card-head { flex-direction: column; align-items: flex-start; gap: 6px; }
+  .ev-kickoff { font-size: 11px; }
 }
