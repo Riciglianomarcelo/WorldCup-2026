@@ -235,15 +235,18 @@ async function doJoin() {
   btn.innerHTML = (currentLang==='es' ? 'Entrando...' : 'Joining...') + ' ⏳';
 
   try {
+    const emailVal = document.getElementById('join-email')?.value?.trim() || undefined;
     const res = await fetch('/api/join', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ name })
+      body: JSON.stringify({ name, email: emailVal })
     });
     const data = await res.json();
 
     if (data.success) {
       setToken(data.token);
+      // Show email prompt after login if they don't have an email yet
+      if (!data.user?.hasEmail && !emailVal) showNotifPrompt();
       currentUser = data.user;
       btn.innerHTML = '✅ ' + (currentLang==='es' ? '¡Estás adentro!' : "You're in!");
       btn.style.background = '#00C853';
@@ -972,6 +975,30 @@ function renderEveryone() {
     html = '<p class="ev-empty">No games match this filter.</p>';
 
   content.innerHTML = html;
+}
+
+// ── NOTIFICATION EMAIL PROMPT ─────────────────────────────────────────────────
+function showNotifPrompt() {
+  if (localStorage.getItem('copa26_notif_dismissed')) return;
+  const el = document.getElementById('notif-prompt');
+  if (el) el.classList.remove('hidden');
+}
+function dismissNotifPrompt() {
+  localStorage.setItem('copa26_notif_dismissed', '1');
+  const el = document.getElementById('notif-prompt');
+  if (el) el.classList.add('hidden');
+}
+async function saveNotifEmail() {
+  const input = document.getElementById('notif-email');
+  const email = input?.value?.trim();
+  if (!email || !email.includes('@')) { input.focus(); return; }
+  try {
+    const r = await authFetch('/api/user/email', { method:'POST', body: JSON.stringify({ email }) });
+    if (r.ok) {
+      showToast('✓ Email saved — you\'ll get game notifications!');
+      dismissNotifPrompt();
+    } else { showToast('❌ Could not save email'); }
+  } catch(e) { showToast('❌ '+e.message); }
 }
 
 // ── SCORE SYNC (admin) ────────────────────────────────────────────────────────
