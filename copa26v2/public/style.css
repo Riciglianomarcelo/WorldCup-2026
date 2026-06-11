@@ -164,7 +164,7 @@ body { background: var(--bg); color: var(--text); font-family: var(--font); min-
   font-weight: 300;
   font-size: 14px;
   letter-spacing: 6px;
-  color: rgba(255,255,255,0.5);
+  color: rgba(255,255,255,0.7);
   text-transform: uppercase;
   animation: c26FadeIn .5s .5s both;
 }
@@ -174,7 +174,7 @@ body { background: var(--bg); color: var(--text); font-family: var(--font); min-
   font-weight: 300;
   font-size: 10px;
   letter-spacing: 2.5px;
-  color: rgba(255,255,255,0.22);
+  color: rgba(255,255,255,0.45);
   text-transform: uppercase;
   margin-top: 6px;
   margin-bottom: 22px;
@@ -183,17 +183,18 @@ body { background: var(--bg); color: var(--text); font-family: var(--font); min-
 
 /* ── Join card ── */
 .join-card {
-  background: rgba(255,255,255,0.046);
-  border: 1px solid rgba(255,255,255,0.11);
+  background: rgba(14,32,24,0.85);
+  border: 1px solid rgba(0,200,83,0.25);
   border-radius: 16px; padding: 22px;
   width: 100%;
   display: flex; flex-direction: column; gap: 12px;
   animation: c26FadeUp .55s .65s both;
+  backdrop-filter: blur(8px);
 }
 
 .join-label {
   font-size: 13px;
-  color: rgba(255,255,255,0.38);
+  color: rgba(255,255,255,0.65);
   font-family: 'Oswald', sans-serif;
   font-weight: 300;
   letter-spacing: 1.5px;
@@ -204,8 +205,8 @@ body { background: var(--bg); color: var(--text); font-family: var(--font); min-
 
 .join-row input {
   flex: 1;
-  background: rgba(255,255,255,0.07);
-  border: 1px solid rgba(255,255,255,0.15);
+  background: rgba(255,255,255,0.12);
+  border: 1px solid rgba(255,255,255,0.25);
   border-radius: 10px; padding: 13px 16px;
   color: #ffffff; font-family: var(--font); font-size: 16px; outline: none;
   transition: border-color .15s, box-shadow .15s;
@@ -214,10 +215,10 @@ body { background: var(--bg); color: var(--text); font-family: var(--font); min-
   border-color: var(--green);
   box-shadow: 0 0 0 3px var(--green-glow);
 }
-.join-row input::placeholder { color: rgba(255,255,255,0.22); }
+.join-row input::placeholder { color: rgba(255,255,255,0.4); }
 
 .join-error { color: #ff5252; font-size: 13px; font-family: var(--font-m); }
-.join-hint  { font-size: 11px; color: rgba(255,255,255,0.22); font-family: var(--font-m); }
+.join-hint  { font-size: 11px; color: rgba(255,255,255,0.45); font-family: var(--font-m); }
 
 /* ── Stats ── */
 .join-stats {
@@ -227,10 +228,10 @@ body { background: var(--bg); color: var(--text); font-family: var(--font); min-
 }
 
 .stat-pill {
-  background: rgba(255,255,255,0.04);
-  border: 1px solid rgba(255,255,255,0.09);
+  background: rgba(255,255,255,0.08);
+  border: 1px solid rgba(255,255,255,0.15);
   border-radius: 999px; padding: 6px 14px;
-  font-size: 12px; color: rgba(255,255,255,0.32);
+  font-size: 12px; color: rgba(255,255,255,0.55);
   font-family: var(--font-m);
 }
 .stat-pill b { color: var(--green); }
@@ -792,19 +793,36 @@ body { background: var(--bg); color: var(--text); font-family: var(--font); min-
 
 /* ═══ RESPONSIVE ═══ */
 @media (max-width: 640px) {
-  .nav { gap: 6px; padding: 0 10px; }
-  .nav-wordmark { display: none; } /* hide wordmark — ring mark alone is enough */
-  .tab-btn { padding: 0 10px; font-size: 12px; height: 44px; } /* 44px = iOS min tap target */
+  .nav { gap: 6px; padding: 0 8px; height: 52px; }
+  .nav-wordmark { display: none; }
+  .nav-logo svg { width: 28px; height: 28px; }
+  .tab-btn { padding: 0 10px; font-size: 12px; height: 40px; min-width: max-content; }
+  .nav-tabs { gap: 1px; scroll-snap-type: x mandatory; padding-right: 12px; }
+  .tab-btn { scroll-snap-align: start; }
   .nav-name { display: none; }
+  .nav-right { gap: 4px; }
+  .icon-btn { width: 36px; height: 36px; font-size: 16px; }
   .picks-grid { grid-template-columns: 1fr; }
   .lb-row { grid-template-columns: 36px 30px 1fr auto; gap: 8px; padding: 12px 14px; }
   .lb-total { font-size: 24px; }
-  /* Team names: clamp long names in portrait */
   .q-team { font-size: 11px; max-width: 90px; overflow: hidden;
             text-overflow: ellipsis; white-space: nowrap; }
-  /* Score inputs: MUST stay ≥16px — iOS Safari zooms the page on any focused input < 16px */
   .q-score-input { width: 36px; font-size: 16px; padding: 8px 2px; }
-  .tab { padding: 16px 12px; }
+  .tab { padding: 14px 10px; }
+  .tab-header { flex-wrap: wrap; gap: 8px; }
+  .tab-header h2 { font-size: 18px; }
+  .kpi-row { grid-template-columns: 1fr 1fr !important; gap: 8px !important; }
+  .groups-grid { grid-template-columns: 1fr; gap: 12px; }
+  .group-table { font-size: 11px; }
+  .group-table th { font-size: 9px; padding: 5px 3px; }
+  .group-table td { padding: 6px 3px; }
+  .group-table th.team-col, .group-table td.team-col { padding-left: 10px; min-width: 80px; }
+  .group-match { font-size: 11px; }
+  .sync-panel { flex-direction: column; gap: 10px; align-items: stretch; }
+  .sync-panel > div:last-child { flex-wrap: wrap; justify-content: center; }
+  .danger-row { flex-direction: column; gap: 8px; }
+  .knockout-editor-header { gap: 8px; }
+  .knockout-grid { grid-template-columns: 1fr; }
 }
 
 /* ═══ SCROLLBAR ═══ */
@@ -882,11 +900,6 @@ body { background: var(--bg); color: var(--text); font-family: var(--font); min-
   font-size: 11px;
   color: var(--text-3);
   text-align: center;
-}
-
-@media (max-width: 640px) {
-  .knockout-editor-header { gap: 8px; }
-  .knockout-grid { grid-template-columns: 1fr; }
 }
 
 /* ═══ RIFISARODEOC LOGO ═══ */
@@ -1080,13 +1093,13 @@ button { -webkit-appearance: none; appearance: none; }
 /* ── Notifications email capture ────────────────────────────────────────── */
 .join-email-row { margin-top: -4px; }
 .join-email-row input {
-  width: 100%; background: rgba(255,255,255,0.05);
-  border: 1px solid rgba(255,255,255,0.1); border-radius: 10px;
-  padding: 11px 16px; color: rgba(255,255,255,0.7); font-size: 16px;
+  width: 100%; background: rgba(255,255,255,0.10);
+  border: 1px solid rgba(255,255,255,0.2); border-radius: 10px;
+  padding: 11px 16px; color: rgba(255,255,255,0.85); font-size: 16px;
   outline: none; transition: border-color .15s; font-family: var(--font);
   box-sizing: border-box;
 }
-.join-email-row input::placeholder { color: rgba(255,255,255,0.2); }
+.join-email-row input::placeholder { color: rgba(255,255,255,0.35); }
 .join-email-row input:focus { border-color: rgba(0,200,83,0.5); }
 
 /* Logged-in email prompt banner */
@@ -1109,3 +1122,94 @@ button { -webkit-appearance: none; appearance: none; }
   font-size: 18px; cursor: pointer; padding: 0 4px; line-height: 1;
 }
 .notif-dismiss:hover { color: var(--text); }
+
+/* ── GROUPS STANDINGS ──────────────────────────────────────────────────────── */
+.groups-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(340px, 1fr));
+  gap: 16px;
+  padding: 4px 0;
+}
+.group-card {
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: 14px;
+  overflow: hidden;
+}
+.group-header {
+  background: var(--green);
+  color: #000;
+  font-weight: 800;
+  font-size: 15px;
+  letter-spacing: 2px;
+  text-transform: uppercase;
+  padding: 10px 16px;
+  text-align: center;
+}
+.group-table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 12px;
+}
+.group-table th {
+  background: var(--bg2);
+  color: var(--text-3);
+  font-weight: 600;
+  font-size: 10px;
+  text-transform: uppercase;
+  letter-spacing: 1px;
+  padding: 6px 4px;
+  text-align: center;
+  border-bottom: 1px solid var(--border);
+}
+.group-table th.team-col,
+.group-table td.team-col {
+  text-align: left;
+  padding-left: 14px;
+  min-width: 100px;
+}
+.group-table td {
+  padding: 7px 4px;
+  text-align: center;
+  color: var(--text-2);
+  border-bottom: 1px solid var(--border);
+}
+.group-table td.pts-col {
+  color: var(--green);
+  font-weight: 700;
+  font-size: 13px;
+}
+.group-table tr.qualify td.team-col {
+  border-left: 3px solid var(--green);
+}
+.group-table tr.playoff td.team-col {
+  border-left: 3px solid var(--gold);
+}
+.group-table tr:last-child td {
+  border-bottom: none;
+}
+.group-matches {
+  padding: 8px 12px 10px;
+  border-top: 1px solid var(--border);
+}
+.group-match {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 5px 0;
+  font-size: 12px;
+  border-bottom: 1px solid color-mix(in srgb, var(--border) 40%, transparent);
+}
+.group-match:last-child { border-bottom: none; }
+.gm-team { flex: 1; color: var(--text); font-weight: 600; }
+.gm-team.r { text-align: right; }
+.gm-score {
+  min-width: 48px; text-align: center;
+  font-weight: 800; color: var(--gold);
+  font-size: 13px;
+}
+.gm-time {
+  min-width: 100px; text-align: center;
+  color: var(--text-3); font-size: 11px;
+}
+.group-match.upcoming .gm-team { color: var(--text-3); }
