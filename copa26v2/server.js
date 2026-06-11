@@ -867,6 +867,16 @@ app.get('/api/admin/emails', requireAdmin, async (req, res) => {
   } catch(e) { res.status(500).json({ error: e.message }); }
 });
 
+// ── Admin: set email for any player ──────────────────────────────────────────
+app.post('/api/admin/set-email', requireAdmin, async (req, res) => {
+  try {
+    const { userId, email } = req.body;
+    if (!userId || !email || !email.includes('@')) return res.status(400).json({ error: 'userId and valid email required' });
+    await db.users.update({ _id: userId }, { $set: { email: email.trim().toLowerCase() } });
+    res.json({ success: true, userId, email: email.trim().toLowerCase() });
+  } catch(e) { res.status(500).json({ error: e.message }); }
+});
+
 // ─── REAL-TIME GROUP STANDINGS ────────────────────────────────────────────────
 app.get('/api/groups/standings', async (req, res) => {
   try {
