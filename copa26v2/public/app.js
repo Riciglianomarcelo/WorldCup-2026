@@ -1143,10 +1143,12 @@ function showConfirm(title, msg, cb) {
   confirmCallback = cb;
   document.getElementById('confirm-modal').classList.remove('hidden');
 }
-function closeConfirm() { document.getElementById('confirm-modal').classList.add('hidden'); confirmCallback = null; }
+function closeConfirm() { document.getElementById('confirm-modal').classList.add('hidden'); }
 document.getElementById('confirm-ok').addEventListener('click', async () => {
+  const cb = confirmCallback;
+  confirmCallback = null;
   closeConfirm();
-  if (confirmCallback) { await confirmCallback(); confirmCallback = null; }
+  if (cb) { await cb(); }
 });
 
 // ── SCORING (mirrors server logic) ────────────────────────────────────────────
@@ -1354,16 +1356,82 @@ function renderGroups() {
 }
 
 // ── ADMIN: Email blast button ─────────────────────────────────────────────────
+const EMAIL_TEMPLATES = {
+  welcome: {
+    subject: '⚽ Copa 26 — The World Cup starts tomorrow! Your quiniela is live',
+    build: (lb) => `
+      <h2>⚽ Welcome to Copa 26!</h2>
+      <p>The World Cup 2026 starts <strong>tomorrow, June 11</strong> with Mexico vs South Africa!</p>
+      <p>Make sure your predictions are in before kickoff — once a game starts, your pick locks. 🔒</p>
+      <div class="banner">🎯 Scoring: <strong>3 pts</strong> for correct winner · <strong>5 pts</strong> for exact score (knockouts)</div>
+      <p>Good luck to everyone — and remember: <em>no crying in quiniela.</em></p>
+      ${buildStandingsHtml(lb)}
+    `,
+  },
+  predictions: {
+    subject: '🔒 Copa 26 — Submit your predictions before kickoff!',
+    build: (lb) => `
+      <h2>🎯 Don't forget your predictions!</h2>
+      <p>Games are coming up and some of you haven't submitted predictions yet. Once a match kicks off, your pick for that game <strong>locks permanently</strong>.</p>
+      <div class="banner">⏰ Go to the <strong>Quiniela</strong> tab, fill in your scores, and hit <strong>Save</strong>. Takes 5 minutes.</div>
+      <p>Remember: <strong>3 pts</strong> for guessing the correct winner, <strong>5 pts</strong> for the exact score in knockout rounds.</p>
+      <p>Don't give free points to everyone else — get your picks in!</p>
+      ${buildStandingsHtml(lb)}
+    `,
+  },
+  results: {
+    subject: '📊 Copa 26 — Today\'s results are in!',
+    build: (lb) => `
+      <h2>⚽ Today's results are in!</h2>
+      <p>Another day of World Cup action is in the books. Check the standings below to see where you stand.</p>
+      ${buildStandingsHtml(lb)}
+      <p>Think you can climb higher? Make sure your upcoming predictions are locked in!</p>
+    `,
+  },
+};
+
+function buildStandingsHtml(lb) {
+  if (!lb?.leaderboard?.length) return '';
+  return `<h2>📊 Current Standings</h2>` +
+    lb.leaderboard.map((p, i) =>
+      `<div class="lbr"><div class="rk">${i+1}</div><div class="nm">${p.avatar} ${p.name}</div><div class="pt">${p.totalPts} pts</div></div>`
+    ).join('');
+}
+
 document.getElementById('btn-send-blast')?.addEventListener('click', async () => {
   const btn = document.getElementById('btn-send-blast');
-  // First check who has emails
+
+  // Pick email type
+  const type = await new Promise(resolve => {
+    const overlay = document.createElement('div');
+    overlay.style.cssText = 'position:fixed;inset:0;background:rgba(0,0,0,0.5);z-index:999;display:flex;align-items:center;justify-content:center;';
+    overlay.innerHTML = `
+      <div style="background:var(--surface);border:1px solid var(--border);border-radius:14px;padding:24px;max-width:340px;width:90%;">
+        <h3 style="margin:0 0 16px;font-size:16px;color:var(--text);">Choose email to send</h3>
+        <div style="display:flex;flex-direction:column;gap:8px;">
+          <button class="btn-green" data-type="welcome" style="width:100%;">⚽ Welcome / Kickoff</button>
+          <button class="btn-green" data-type="predictions" style="width:100%;background:#b8860b;">🎯 Submit Predictions Reminder</button>
+          <button class="btn-green" data-type="results" style="width:100%;background:#1B55B8;">📊 Today's Results</button>
+          <button class="btn-ghost" data-type="" style="width:100%;margin-top:4px;">Cancel</button>
+        </div>
+      </div>`;
+    overlay.addEventListener('click', (e) => {
+      const t = e.target.closest('[data-type]');
+      if (t) { overlay.remove(); resolve(t.dataset.type); }
+    });
+    document.body.appendChild(overlay);
+  });
+
+  if (!type) return;
+
+  // Check recipients
   try {
     const r = await authFetch('/api/admin/emails');
     const data = await r.json();
     if (!data.total) { showToast('❌ No users have provided emails yet'); return; }
     const names = data.emails.map(e => `${e.name} (${e.email})`).join('\n');
     const ok = window.confirm(
-      `Send the Copa 26 welcome email to ${data.total} recipient(s)?\n\n${names}\n\nProceed?`
+      `Send "${type}" email to ${data.total} recipient(s)?\n\n${names}\n\nProceed?`
     );
     if (!ok) return;
   } catch(e) { showToast('❌ ' + e.message); return; }
@@ -1371,39 +1439,23 @@ document.getElementById('btn-send-blast')?.addEventListener('click', async () =>
   btn.disabled = true; btn.textContent = '📤 Sending...';
   try {
     const lb = await (await fetch('/api/leaderboard')).json();
-    const day = new Date().toLocaleDateString('en-US', { month:'short', day:'numeric' });
-
-    const standingsHtml = lb.leaderboard?.length
-      ? `<h2>📊 Current Standings</h2>` +
-        lb.leaderboard.map((p,i) =>
-          `<div class="lbr"><div class="rk">${i+1}</div><div class="nm">${p.avatar} ${p.name}</div><div class="pt">${p.totalPts} pts</div></div>`
-        ).join('')
-      : '';
-
-    const bodyHtml = `
-      <h2>⚽ Welcome to Copa 26!</h2>
-      <p>The World Cup 2026 starts <strong>tomorrow, June 11</strong> with Mexico vs South Africa!</p>
-      <p>Make sure your predictions are in before kickoff — once a game starts, your pick locks. 🔒</p>
-      <div class="banner">🎯 Scoring: <strong>3 pts</strong> for correct winner · <strong>5 pts</strong> for exact score (knockouts)</div>
-      <p>Good luck to everyone — and remember: <em>no crying in quiniela.</em></p>
-      ${standingsHtml}
-    `;
+    const template = EMAIL_TEMPLATES[type];
 
     const r = await authFetch('/api/admin/send-blast', {
       method: 'POST',
       body: JSON.stringify({
-        subject: `⚽ Copa 26 — The World Cup starts tomorrow! Your quiniela is live`,
-        html: bodyHtml,
+        subject: template.subject,
+        html: template.build(lb),
       }),
     });
     const data = await r.json();
     if (data.success) {
-      showToast(`✅ Email sent to ${data.sentTo} recipient(s)!`);
+      showToast(`✅ "${type}" email sent to ${data.sentTo} recipient(s)!`);
     } else {
       showToast('❌ ' + (data.error || 'Failed'));
     }
   } catch(e) { showToast('❌ ' + e.message); }
-  btn.disabled = false; btn.textContent = '📨 Send Welcome Email';
+  btn.disabled = false; btn.textContent = '📨 Send Email';
 });
 
 // ── GO ────────────────────────────────────────────────────────────────────────
