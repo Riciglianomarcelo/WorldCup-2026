@@ -544,6 +544,16 @@ body { background: var(--bg); color: var(--text); font-family: var(--font); min-
 
 .q-dash { font-size: 14px; color: var(--text-3); font-weight: 600; }
 
+.q-tip {
+  grid-column: 1 / -1;
+  font-size: 11px;
+  color: var(--text-3);
+  padding: 4px 0 0;
+  border-top: 1px dashed var(--border);
+  margin-top: 4px;
+}
+.q-tip strong { color: var(--text-2); }
+
 .q-result-badge {
   font-size: 11px;
   font-weight: 600;
@@ -551,8 +561,9 @@ body { background: var(--bg); color: var(--text); font-family: var(--font); min-
   border-radius: 4px;
   margin-left: 6px;
 }
-.q-pts-5 { background: rgba(234,179,8,.12); color: var(--gold); }
-.q-pts-3 { background: var(--green-glow); color: var(--green); }
+.q-pts-12 { background: rgba(234,179,8,.15); color: var(--gold); font-weight: 700; }
+.q-pts-6 { background: var(--green-glow); color: var(--green); }
+.q-pts-3 { background: rgba(59,130,246,.1); color: var(--blue); }
 .q-pts-0 { background: rgba(239,68,68,.08); color: var(--red); }
 
 /* ═══ RESULTS TABS ═══ */
