@@ -1144,6 +1144,77 @@ async function notifyLockSoon() {
   }
 }
 
+// ── TRIGGER 3: Morning prediction reminder ───────────────────────────────────
+// Runs every 30 min. If there are games TODAY and it's between 7–10 AM ET,
+// sends ONE reminder per day to players who haven't filled all today's games.
+
+async function notifyMorningReminder() {
+  const recipients = await getEmailRecipients();
+  if (!recipients.length) return;
+
+  // Check if we already sent today's morning reminder
+  const todayKey = new Date().toISOString().slice(0, 10);
+  if (await notifSent('morning', todayKey)) return;
+
+  // Only send between 7 AM and 10 AM ET (UTC-4 = 11:00–14:00 UTC)
+  const nowUTC = new Date();
+  const hourUTC = nowUTC.getUTCHours();
+  if (hourUTC < 11 || hourUTC >= 14) return;
+
+  // Find today's games
+  const todayGames = [];
+  for (const [gid, f] of Object.entries(GROUP_FIXTURES)) {
+    if (!f.kickoff) continue;
+    const ko = new Date(f.kickoff);
+    if (ko.toISOString().slice(0, 10) === todayKey) {
+      const game = ALL_GAMES.find(g => g.id === gid);
+      if (game) todayGames.push({ ...game, kickoff: f.kickoff, ko });
+    }
+  }
+  if (!todayGames.length) return;
+
+  // Check which players are missing picks for today's games
+  const allPicks = await db.quiniela_picks.find({});
+  const picksMap = {};
+  allPicks.forEach(p => { picksMap[p.userId] = p.picks || {}; });
+  const isFilled = p => p && String(p.homeGoals).trim() !== '' && String(p.awayGoals).trim() !== '';
+
+  const playersToNotify = recipients.filter(u => {
+    return todayGames.some(g => !isFilled(picksMap[u._id]?.[g.id]));
+  });
+  if (!playersToNotify.length) return;
+
+  // Sort games by kickoff
+  todayGames.sort((a, b) => a.ko - b.ko);
+  const firstKO = todayGames[0].ko;
+  const timeStr = firstKO.toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit', timeZone: 'America/New_York' });
+
+  const gamesListHtml = todayGames.map(g =>
+    `<div class="gr"><div class="tm">${g.home}</div><div class="sc" style="font-size:13px;color:#999">vs</div><div class="tm r">${g.away}</div></div>`
+  ).join('');
+
+  const lb = await quickLeaderboard();
+  const standingsHtml = `<h2>📊 Standings</h2>` +
+    lb.slice(0, 8).map((p, i) =>
+      `<div class="lbr"><div class="rk">${i+1}</div><div class="nm">${p.avatar} ${p.name}</div><div class="pt">${p.pts} pts</div></div>`
+    ).join('');
+
+  await notifMark('morning', todayKey);
+
+  await sendEmail({
+    to: playersToNotify.map(u => u.email),
+    subject: `🎯 Copa 26 — ${todayGames.length} game${todayGames.length > 1 ? 's' : ''} today! Lock your picks`,
+    html: emailWrap(
+      `<h2>🎯 Today's matches</h2>
+      <p>${todayGames.length} game${todayGames.length > 1 ? 's' : ''} today — first kickoff at <strong>${timeStr} ET</strong>. Your picks lock when the match starts!</p>
+      ${gamesListHtml}
+      <div class="banner">⚠️ You have unpicked games today. Open the app and fill them in before kickoff!</div>
+      ${standingsHtml}`
+    ),
+  });
+  console.log(`📧 morning reminder → ${playersToNotify.length} player(s) (${todayGames.length} games today)`);
+}
+
 // ─────────────────────────────────────────────────────────────────────────────
 
 if (!process.env.ADMIN_SECRET)
@@ -1156,5 +1227,8 @@ setInterval(() => runSync('interval').catch(e => console.error('sync error', e.m
 
 // Lock-soon reminders: check every 15 minutes for games kicking off in 1–2.5 hours.
 setInterval(() => notifyLockSoon().catch(e => console.error('lock reminder error', e.message)), 15 * 60 * 1000);
+
+// Morning prediction reminder: check every 30 minutes, sends once per day between 7–10 AM ET.
+setInterval(() => notifyMorningReminder().catch(e => console.error('morning reminder error', e.message)), 30 * 60 * 1000);
 
 app.listen(PORT, () => console.log(`⚽ Copa 26 v2 on port ${PORT}`));
