@@ -3,7 +3,7 @@ const jwt = require('jsonwebtoken');
 const path = require('path');
 const fs = require('fs');
 const Datastore = require('nedb-promises');
-const nodemailer = require('nodemailer');
+// nodemailer removed — emails routed through n8n webhook (Gmail OAuth2 over HTTPS, bypasses Railway port block)
 
 const app = express();
 const PORT = process.env.PORT || 3000;
@@ -753,6 +753,7 @@ app.get('/api/admin/players', requireAdmin, async (req, res) => {
 
     const players = users.map(u => ({
       id: u._id, name: u.name, avatar: u.avatar, joinedAt: u.joinedAt,
+      email: u.email || null,
       hasAwardsPicks: !!awardsMap[u._id],
       hasQuinielaPicks: !!quinielaMap[u._id],
       awardsPicks: awardsMap[u._id]?.picks || null,
@@ -767,6 +768,7 @@ app.get('/api/admin/players', requireAdmin, async (req, res) => {
     res.json({
       players,
       totalPlayers: players.length,
+      totalWithEmail: players.filter(p=>p.email).length,
       totalWithAwards: players.filter(p=>p.hasAwardsPicks).length,
       totalWithQuiniela: players.filter(p=>p.hasQuinielaPicks).length,
       awardsResultsSet: !!awardsResults,
@@ -818,8 +820,8 @@ app.post('/api/admin/test-email', requireAdmin, async (req, res) => {
   try {
     const { to } = req.body;
     if (!to || !to.includes('@')) return res.status(400).json({ error: 'Provide a valid email address' });
-    if (!process.env.GMAIL_USER || !process.env.GMAIL_PASS)
-      return res.status(503).json({ error: 'GMAIL_USER / GMAIL_PASS not set in Railway env vars' });
+    if (!process.env.N8N_WEBHOOK_URL)
+      return res.status(503).json({ error: 'N8N_WEBHOOK_URL not set in Railway env vars' });
     const lb = await quickLeaderboard();
     const day = new Date().toLocaleDateString('en-US', { month:'short', day:'numeric' });
     const standingsHtml = `<h2>📊 Standings · ${day}</h2>` +
@@ -833,6 +835,96 @@ app.post('/api/admin/test-email', requireAdmin, async (req, res) => {
       html: emailWrap(testNote + standingsHtml),
     });
     res.json({ success: true, sentTo: to });
+  } catch(e) { res.status(500).json({ error: e.message }); }
+});
+
+// ── Send blast email to all users with emails ────────────────────────────────
+app.post('/api/admin/send-blast', requireAdmin, async (req, res) => {
+  try {
+    const { subject, html } = req.body;
+    if (!subject || !html) return res.status(400).json({ error: 'subject and html required' });
+    if (!process.env.N8N_WEBHOOK_URL)
+      return res.status(503).json({ error: 'N8N_WEBHOOK_URL not set in Railway env vars' });
+    const recipients = await getEmailRecipients();
+    if (!recipients.length) return res.status(400).json({ error: 'No users have provided emails yet' });
+    await sendEmail({
+      to: recipients.map(u => u.email),
+      subject,
+      html: emailWrap(html),
+    });
+    res.json({ success: true, sentTo: recipients.length, emails: recipients.map(u => u.email) });
+  } catch(e) { res.status(500).json({ error: e.message }); }
+});
+
+// ── List email recipients (admin) ────────────────────────────────────────────
+app.get('/api/admin/emails', requireAdmin, async (req, res) => {
+  try {
+    const recipients = await getEmailRecipients();
+    res.json({
+      total: recipients.length,
+      emails: recipients.map(u => ({ name: u.name, email: u.email })),
+    });
+  } catch(e) { res.status(500).json({ error: e.message }); }
+});
+
+// ─── REAL-TIME GROUP STANDINGS ────────────────────────────────────────────────
+app.get('/api/groups/standings', async (req, res) => {
+  try {
+    const qResults = await db.quiniela_results.findOne({ _id: 'official' });
+    const results = qResults?.data || {};
+    const groupGames = ALL_GAMES.filter(g => g.phase === 'group');
+
+    const standings = {};
+    for (const [group, teams] of Object.entries(GROUPS)) {
+      standings[group] = teams.map(t => ({
+        team: t, mp: 0, w: 0, d: 0, l: 0, gf: 0, ga: 0, gd: 0, pts: 0,
+      }));
+    }
+
+    // Process each group game result
+    for (const game of groupGames) {
+      const r = results[game.id];
+      if (!r) continue;
+      const h = parseInt(r.homeGoals); const a = parseInt(r.awayGoals);
+      if (isNaN(h) || isNaN(a)) continue;
+
+      const group = game.group;
+      const homeRow = standings[group].find(t => t.team === game.home);
+      const awayRow = standings[group].find(t => t.team === game.away);
+      if (!homeRow || !awayRow) continue;
+
+      homeRow.mp++; awayRow.mp++;
+      homeRow.gf += h; homeRow.ga += a;
+      awayRow.gf += a; awayRow.ga += h;
+
+      if (h > a)      { homeRow.w++; homeRow.pts += 3; awayRow.l++; }
+      else if (h < a)  { awayRow.w++; awayRow.pts += 3; homeRow.l++; }
+      else             { homeRow.d++; awayRow.d++; homeRow.pts += 1; awayRow.pts += 1; }
+
+      homeRow.gd = homeRow.gf - homeRow.ga;
+      awayRow.gd = awayRow.gf - awayRow.ga;
+    }
+
+    // Sort each group: pts desc, gd desc, gf desc, name asc
+    for (const group of Object.keys(standings)) {
+      standings[group].sort((a, b) =>
+        b.pts - a.pts || b.gd - a.gd || b.gf - a.gf || a.team.localeCompare(b.team)
+      );
+    }
+
+    // Also include group schedule with results and kickoffs
+    const schedule = {};
+    for (const game of groupGames) {
+      if (!schedule[game.group]) schedule[game.group] = [];
+      const r = results[game.id];
+      const kickoff = GROUP_FIXTURES[game.id]?.kickoff || null;
+      schedule[game.group].push({
+        id: game.id, home: game.home, away: game.away, kickoff,
+        result: r ? { homeGoals: r.homeGoals, awayGoals: r.awayGoals } : null,
+      });
+    }
+
+    res.json({ standings, schedule, groups: Object.keys(GROUPS) });
   } catch(e) { res.status(500).json({ error: e.message }); }
 });
 
@@ -873,34 +965,28 @@ function getAvatar(name) {
 //
 // Requires: GMAIL_USER, GMAIL_PASS, APP_URL
 
-let _mailer = null;
-function getMailer() {
-  if (!_mailer) _mailer = nodemailer.createTransport({
-    host: 'smtp.gmail.com',
-    port: 587,
-    secure: false,
-    auth: { user: process.env.GMAIL_USER, pass: process.env.GMAIL_PASS },
-    connectionTimeout: 10000,
-    greetingTimeout:  10000,
-    socketTimeout:    15000,
-    debug: true,   // log full SMTP conversation to console
-    logger: true,
-  });
-  return _mailer;
-}
+// ── n8n webhook transport ─────────────────────────────────────────────────────
+// n8n's Gmail node uses OAuth2 over HTTPS — no SMTP port needed. Railway-safe.
+// Set N8N_WEBHOOK_URL in Railway env vars (e.g. https://n8n.4geeks.com/webhook/copa26-email)
 
 async function sendEmail({ to, subject, html }) {
-  if (!process.env.GMAIL_USER || !process.env.GMAIL_PASS) return;
+  const webhookUrl = process.env.N8N_WEBHOOK_URL;
+  if (!webhookUrl) { console.warn('⚠️  N8N_WEBHOOK_URL not set — email skipped'); return; }
   const toArr = Array.isArray(to) ? to : [to];
-  const opts = { from: `Copa 26 <${process.env.GMAIL_USER}>`, subject, html };
-  if (toArr.length === 1) { opts.to = toArr[0]; }
-  else { opts.to = process.env.GMAIL_USER; opts.bcc = toArr.join(', '); }
   try {
-    await getMailer().sendMail(opts);
+    const resp = await fetch(webhookUrl, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ to: toArr, subject, html }),
+    });
+    if (!resp.ok) {
+      const text = await resp.text().catch(() => '');
+      throw new Error(`n8n responded ${resp.status}: ${text}`);
+    }
+    console.log(`📧 email via n8n → ${toArr.length} recipient(s)`);
   } catch(e) {
-    console.error('📧 email error:', e.message);
-    _mailer = null; // reset connection
-    throw e;        // re-throw so callers (especially test endpoint) see the real error
+    console.error('📧 n8n webhook error:', e.message);
+    throw e;
   }
 }
 
@@ -1062,7 +1148,7 @@ async function notifyLockSoon() {
 
 if (!process.env.ADMIN_SECRET)
  console.warn('⚠️  ADMIN_SECRET not set — admin endpoints are disabled until you set it.');
-if (!process.env.GMAIL_USER || !process.env.GMAIL_PASS) console.warn('⚠️  GMAIL_USER / GMAIL_PASS not set — email notifications disabled.');
+if (!process.env.N8N_WEBHOOK_URL) console.warn('⚠️  N8N_WEBHOOK_URL not set — email notifications disabled.');
 
 // Autonomous score sync: catch-up shortly after boot, then every 30 minutes.
 setTimeout(() => runSync('startup').catch(e => console.error('sync error', e.message)), 8000);
