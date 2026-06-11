@@ -330,12 +330,16 @@ function scoreGame(pick, result, phase) {
   const ph = String(pick.homeGoals).trim(), pa = String(pick.awayGoals).trim();
   const rh = String(result.homeGoals).trim(), ra = String(result.awayGoals).trim();
   if (ph === '' || pa === '' || rh === '' || ra === '') return 0;
-  // Exact score = 5 pts (any phase)
-  if (ph === rh && pa === ra) return 5;
-  // Correct winner/draw = 3 pts
-  const pickOutcome = getOutcome(pick.homeGoals, pick.awayGoals);
-  const realOutcome = getOutcome(result.homeGoals, result.awayGoals);
-  return pickOutcome === realOutcome ? 3 : 0;
+  let pts = 0;
+  // 3 pts — correct winner/draw
+  if (getOutcome(ph, pa) === getOutcome(rh, ra)) pts += 3;
+  // 3 pts — guessed home team's exact goals
+  if (ph === rh) pts += 3;
+  // 3 pts — guessed away team's exact goals
+  if (pa === ra) pts += 3;
+  // 3 pts — exact full score bonus
+  if (ph === rh && pa === ra) pts += 3;
+  return pts;  // max 12 per game
 }
 
 function getOutcome(home, away) {
