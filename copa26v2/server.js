@@ -820,8 +820,7 @@ app.post('/api/admin/test-email', requireAdmin, async (req, res) => {
   try {
     const { to } = req.body;
     if (!to || !to.includes('@')) return res.status(400).json({ error: 'Provide a valid email address' });
-    if (!process.env.N8N_WEBHOOK_URL)
-      return res.status(503).json({ error: 'N8N_WEBHOOK_URL not set in Railway env vars' });
+    // webhook URL handled by sendEmail fallback
     const lb = await quickLeaderboard();
     const day = new Date().toLocaleDateString('en-US', { month:'short', day:'numeric' });
     const standingsHtml = `<h2>📊 Standings · ${day}</h2>` +
@@ -843,8 +842,7 @@ app.post('/api/admin/send-blast', requireAdmin, async (req, res) => {
   try {
     const { subject, html } = req.body;
     if (!subject || !html) return res.status(400).json({ error: 'subject and html required' });
-    if (!process.env.N8N_WEBHOOK_URL)
-      return res.status(503).json({ error: 'N8N_WEBHOOK_URL not set in Railway env vars' });
+    // webhook URL handled by sendEmail fallback
     const recipients = await getEmailRecipients();
     if (!recipients.length) return res.status(400).json({ error: 'No users have provided emails yet' });
     await sendEmail({
@@ -1229,7 +1227,7 @@ async function notifyMorningReminder() {
 
 if (!process.env.ADMIN_SECRET)
  console.warn('⚠️  ADMIN_SECRET not set — admin endpoints are disabled until you set it.');
-if (!process.env.N8N_WEBHOOK_URL) console.warn('⚠️  N8N_WEBHOOK_URL not set — email notifications disabled.');
+// webhook URL has hardcoded fallback
 
 // Autonomous score sync: catch-up shortly after boot, then every 30 minutes.
 setTimeout(() => runSync('startup').catch(e => console.error('sync error', e.message)), 8000);
