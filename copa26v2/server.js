@@ -327,17 +327,15 @@ async function runSync(trigger = 'auto') {
 // Knockout: predict exact score → 5 pts exact, 3 pts correct winner
 function scoreGame(pick, result, phase) {
   if (!pick || !result) return 0;
-  if (phase === 'group') {
-    const pickOutcome = getOutcome(pick.homeGoals, pick.awayGoals);
-    const realOutcome = getOutcome(result.homeGoals, result.awayGoals);
-    return pickOutcome === realOutcome ? 3 : 0;
-  } else {
-    // Knockout: exact score = 5, correct winner = 3
-    if (String(pick.homeGoals) === String(result.homeGoals) && String(pick.awayGoals) === String(result.awayGoals)) return 5;
-    const pickOutcome = getOutcome(pick.homeGoals, pick.awayGoals);
-    const realOutcome = getOutcome(result.homeGoals, result.awayGoals);
-    return pickOutcome === realOutcome ? 3 : 0;
-  }
+  const ph = String(pick.homeGoals).trim(), pa = String(pick.awayGoals).trim();
+  const rh = String(result.homeGoals).trim(), ra = String(result.awayGoals).trim();
+  if (ph === '' || pa === '' || rh === '' || ra === '') return 0;
+  // Exact score = 5 pts (any phase)
+  if (ph === rh && pa === ra) return 5;
+  // Correct winner/draw = 3 pts
+  const pickOutcome = getOutcome(pick.homeGoals, pick.awayGoals);
+  const realOutcome = getOutcome(result.homeGoals, result.awayGoals);
+  return pickOutcome === realOutcome ? 3 : 0;
 }
 
 function getOutcome(home, away) {
