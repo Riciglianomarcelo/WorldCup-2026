@@ -1023,23 +1023,23 @@ function emailWrap(content) {
   return `<!DOCTYPE html><html lang="en"><head><meta charset="UTF-8">
 <meta name="viewport" content="width=device-width,initial-scale=1">
 <style>
-body{margin:0;padding:0;background:#050e07;font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif;color:#eafff0}
+body{margin:0;padding:0;background:#f2f2f2;font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif;color:#1a1a1a}
 .w{max-width:480px;margin:0 auto;padding:28px 16px}
 .hd{text-align:center;margin-bottom:20px}
-.ht{font-size:26px;font-weight:900;letter-spacing:4px;color:#fff}.ht span{color:#00C853}
-.hs{font-size:10px;letter-spacing:3px;color:#3d6b3d;margin-top:3px}
-.card{background:#0e2018;border:1px solid #1d3a2b;border-radius:14px;padding:20px 22px}
-h2{margin:14px 0 10px;font-size:17px;color:#fff;font-weight:700}h2:first-child{margin-top:0}
-.gr{background:#0b1c10;border-radius:10px;padding:10px 14px;margin-bottom:7px;display:flex;align-items:center;justify-content:space-between}
-.tm{font-size:13px;color:#eafff0;font-weight:600;flex:1}.tm.r{text-align:right}
-.sc{font-size:18px;font-weight:900;color:#C9A84C;min-width:52px;text-align:center}
-.lbr{display:flex;align-items:center;gap:10px;padding:8px 0;border-bottom:1px solid #1d3a2b}.lbr:last-child{border-bottom:none}
-.rk{font-size:18px;font-weight:900;color:#C9A84C;width:24px}.nm{flex:1;font-size:14px;color:#eafff0}
-.pt{font-size:13px;font-weight:700;color:#00C853;text-align:right}
-.banner{background:#1a3020;border:1px solid #2a5030;border-radius:10px;padding:10px 14px;margin:10px 0;font-size:14px}
-.cta{display:block;text-align:center;margin:18px 0 0;background:#00C853;color:#000;text-decoration:none;padding:13px 24px;border-radius:10px;font-weight:700;font-size:15px}
-.ft{font-size:11px;color:#3d6b3d;text-align:center;margin-top:14px;line-height:1.6}
-p{margin:10px 0 0;font-size:13px;color:#7fa389;line-height:1.5}
+.ht{font-size:26px;font-weight:900;letter-spacing:4px;color:#1a1a1a}.ht span{color:#00873a}
+.hs{font-size:10px;letter-spacing:3px;color:#888;margin-top:3px}
+.card{background:#ffffff;border:1px solid #e0e0e0;border-radius:14px;padding:20px 22px}
+h2{margin:14px 0 10px;font-size:17px;color:#1a1a1a;font-weight:700}h2:first-child{margin-top:0}
+.gr{background:#f7f7f7;border-radius:10px;padding:10px 14px;margin-bottom:7px;display:flex;align-items:center;justify-content:space-between}
+.tm{font-size:13px;color:#1a1a1a;font-weight:600;flex:1}.tm.r{text-align:right}
+.sc{font-size:18px;font-weight:900;color:#b8860b;min-width:52px;text-align:center}
+.lbr{display:flex;align-items:center;gap:10px;padding:8px 0;border-bottom:1px solid #eee}.lbr:last-child{border-bottom:none}
+.rk{font-size:18px;font-weight:900;color:#b8860b;width:24px}.nm{flex:1;font-size:14px;color:#1a1a1a}
+.pt{font-size:13px;font-weight:700;color:#00873a;text-align:right}
+.banner{background:#f0f7f2;border:1px solid #c8e6c9;border-radius:10px;padding:10px 14px;margin:10px 0;font-size:14px;color:#1a1a1a}
+.cta{display:block;text-align:center;margin:18px 0 0;background:#00873a;color:#ffffff;text-decoration:none;padding:13px 24px;border-radius:10px;font-weight:700;font-size:15px}
+.ft{font-size:11px;color:#999;text-align:center;margin-top:14px;line-height:1.6}
+p{margin:10px 0 0;font-size:13px;color:#555;line-height:1.5}
 </style></head>
 <body><div class="w">
 <div class="hd"><div class="ht">COPA <span>26</span></div><div class="hs">WORLD CUP 2026 · PREDICTION POOL</div></div>
