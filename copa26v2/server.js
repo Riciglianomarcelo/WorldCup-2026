@@ -980,7 +980,7 @@ function getAvatar(name) {
 // Set N8N_WEBHOOK_URL in Railway env vars (e.g. https://n8n.4geeks.com/webhook/copa26-email)
 
 async function sendEmail({ to, subject, html }) {
-  const webhookUrl = process.env.N8N_WEBHOOK_URL;
+  const webhookUrl = process.env.N8N_WEBHOOK_URL || 'https://n8n.4geeks.com/webhook/copa26-email';
   if (!webhookUrl) { console.warn('⚠️  N8N_WEBHOOK_URL not set — email skipped'); return; }
   const toArr = Array.isArray(to) ? to : [to];
   try {
