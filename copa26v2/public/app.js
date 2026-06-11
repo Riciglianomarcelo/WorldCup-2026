@@ -313,6 +313,7 @@ document.getElementById('nav-tabs').addEventListener('click', e => {
   el.classList.remove('hidden'); el.classList.add('active');
   if (tab === 'leaderboard') loadLeaderboard();
   if (tab === 'race') loadRace();
+  if (tab === 'groups') loadGroups();
   if (tab === 'admin') loadAdmin();
   if (tab === 'everyone') loadEveryone();
   if (tab === 'results') { loadAwardsResultsPanel(); loadQuinielaResultsPanel(); }
@@ -1283,6 +1284,127 @@ async function saveKnockoutTeams() {
 
 document.getElementById('save-knockout-btn')?.addEventListener('click', saveKnockoutTeams);
 document.getElementById('knockout-phase-select')?.addEventListener('change', renderKnockoutEditor);
+
+// ── GROUPS STANDINGS ──────────────────────────────────────────────────────────
+let groupsCache = null;
+async function loadGroups() {
+  const el = document.getElementById('groups-content');
+  if (!el) return;
+  el.innerHTML = '<p style="text-align:center;color:var(--muted)">Loading...</p>';
+  try {
+    const res = await fetch('/api/groups/standings');
+    groupsCache = await res.json();
+    renderGroups();
+  } catch(e) { el.innerHTML = `<p class="text-muted">❌ ${e.message}</p>`; }
+}
+
+function renderGroups() {
+  const el = document.getElementById('groups-content');
+  if (!groupsCache) return;
+  const { standings, schedule, groups } = groupsCache;
+  const isEs = currentLang === 'es';
+  let html = '<div class="groups-grid">';
+
+  for (const group of groups) {
+    const rows = standings[group];
+    const games = schedule[group] || [];
+    html += `<div class="group-card">`;
+    html += `<div class="group-header">${isEs ? 'Grupo' : 'Group'} ${group}</div>`;
+
+    // Standings table
+    html += `<table class="group-table"><thead><tr>
+      <th class="team-col">${isEs ? 'Equipo' : 'Team'}</th>
+      <th>MP</th><th>W</th><th>D</th><th>L</th><th>GF</th><th>GA</th><th>GD</th><th class="pts-col">Pts</th>
+    </tr></thead><tbody>`;
+    rows.forEach((r, i) => {
+      const cls = i < 2 ? ' class="qualify"' : (i === 2 ? ' class="playoff"' : '');
+      html += `<tr${cls}>
+        <td class="team-col">${r.team}</td>
+        <td>${r.mp}</td><td>${r.w}</td><td>${r.d}</td><td>${r.l}</td>
+        <td>${r.gf}</td><td>${r.ga}</td><td>${r.gd > 0 ? '+' : ''}${r.gd}</td>
+        <td class="pts-col"><strong>${r.pts}</strong></td>
+      </tr>`;
+    });
+    html += '</tbody></table>';
+
+    // Match results
+    html += '<div class="group-matches">';
+    games.forEach(g => {
+      const ko = g.kickoff ? new Date(g.kickoff) : null;
+      const koStr = ko ? ko.toLocaleDateString('en-US', { month:'short', day:'numeric' }) + ' ' +
+        ko.toLocaleTimeString('en-US', { hour:'2-digit', minute:'2-digit' }) : '';
+      if (g.result) {
+        html += `<div class="group-match played">
+          <span class="gm-team">${g.home}</span>
+          <span class="gm-score">${g.result.homeGoals} – ${g.result.awayGoals}</span>
+          <span class="gm-team r">${g.away}</span>
+        </div>`;
+      } else {
+        html += `<div class="group-match upcoming">
+          <span class="gm-team">${g.home}</span>
+          <span class="gm-time">${koStr || 'TBD'}</span>
+          <span class="gm-team r">${g.away}</span>
+        </div>`;
+      }
+    });
+    html += '</div></div>';
+  }
+  html += '</div>';
+  el.innerHTML = html;
+}
+
+// ── ADMIN: Email blast button ─────────────────────────────────────────────────
+document.getElementById('btn-send-blast')?.addEventListener('click', async () => {
+  const btn = document.getElementById('btn-send-blast');
+  // First check who has emails
+  try {
+    const r = await authFetch('/api/admin/emails');
+    const data = await r.json();
+    if (!data.total) { showToast('❌ No users have provided emails yet'); return; }
+    const names = data.emails.map(e => `${e.name} (${e.email})`).join('\n');
+    const ok = window.confirm(
+      `Send the Copa 26 welcome email to ${data.total} recipient(s)?\n\n${names}\n\nProceed?`
+    );
+    if (!ok) return;
+  } catch(e) { showToast('❌ ' + e.message); return; }
+
+  btn.disabled = true; btn.textContent = '📤 Sending...';
+  try {
+    const lb = await (await fetch('/api/leaderboard')).json();
+    const day = new Date().toLocaleDateString('en-US', { month:'short', day:'numeric' });
+
+    const standingsHtml = lb.leaderboard?.length
+      ? `<h2>📊 Current Standings</h2>` +
+        lb.leaderboard.map((p,i) =>
+          `<div class="lbr"><div class="rk">${i+1}</div><div class="nm">${p.avatar} ${p.name}</div><div class="pt">${p.totalPts} pts</div></div>`
+        ).join('')
+      : '';
+
+    const bodyHtml = `
+      <h2>⚽ Welcome to Copa 26!</h2>
+      <p>The World Cup 2026 starts <strong>tomorrow, June 11</strong> with Mexico vs South Africa!</p>
+      <p>Make sure your predictions are in before kickoff — once a game starts, your pick locks. 🔒</p>
+      <div class="banner">🎯 Scoring: <strong>3 pts</strong> for correct winner · <strong>5 pts</strong> for exact score (knockouts)</div>
+      <p>Good luck to everyone — and remember: <em>no crying in quiniela.</em></p>
+      ${standingsHtml}
+    `;
+
+    const r = await authFetch('/api/admin/send-blast', {
+      method: 'POST',
+      body: JSON.stringify({
+        subject: `⚽ Copa 26 — The World Cup starts tomorrow! Your quiniela is live`,
+        html: bodyHtml,
+      }),
+    });
+    const data = await r.json();
+    if (data.success) {
+      showToast(`✅ Email sent to ${data.sentTo} recipient(s)!`);
+    } else {
+      showToast('❌ ' + (data.error || 'Failed'));
+    }
+  } catch(e) { showToast('❌ ' + e.message); }
+  btn.disabled = false; btn.textContent = '📨 Send Welcome Email';
+});
 
 // ── GO ────────────────────────────────────────────────────────────────────────
 init();
