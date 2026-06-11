@@ -27,7 +27,7 @@ const I18N = {
     welcome_sub: "FIFA doesn't know about this. Let's keep it that way. 🤫",
     rule1: '🏅 Awards — Pick 1st/2nd/3rd for 8 categories (Golden Boot, Champion, etc.)',
     rule2: '⚽ Quiniela — Predict results for all 104 World Cup games',
-    rule3: '📊 Scoring — Correct winner = 3 pts · Exact score = 5 pts',
+    rule3: '📊 Scoring — Winner +3 · Each team goals +3 · Exact score +3 · Max 12/game',
     rule4: '🏆 Win — Most total points = eternal bragging rights',
     welcome_btn: 'Let the games begin! ⚽',
     welcome_footer: 'Come back anytime with the same name',
@@ -42,7 +42,7 @@ const I18N = {
     quiniela_results_desc: 'Enter scores as games finish. You can update anytime.',
     save_awards_results: '💾 Save Award Results',
     save_quiniela_results: '💾 Save Game Results',
-    quiniela_desc: 'Predict the score for every game. Group stage: predict winner = 3pts. Knockouts: exact score = 5pts, correct winner = 3pts.',
+    quiniela_desc: 'Predict the score for every game. Winner +3pts, each team goals +3pts, exact score +3pts. Max 12 per game.',
     save_quiniela: '⚽ Save Picks', quiniela_note: 'Save often — your picks auto-update',
     all_games: 'All Games', group_stage: 'Group Stage',
     round_32: 'Round of 32', round_16: 'Round of 16',
@@ -82,7 +82,7 @@ const I18N = {
     welcome_sub: "La FIFA no sabe que esto existe. Mejor así. 🤫",
     rule1: '🏅 Premios — Elige 1ro/2do/3ro en 8 categorías (Bota de Oro, Campeón, etc.)',
     rule2: '⚽ Quiniela — Predice los resultados de los 104 partidos del Mundial',
-    rule3: '📊 Puntuación — Ganador correcto = 3 pts · Marcador exacto = 5 pts',
+    rule3: '📊 Puntuación — Ganador +3 · Goles equipo +3 · Marcador exacto +3 · Máx 12/partido',
     rule4: '🏆 Ganar — El que más puntos tenga = gloria eterna',
     welcome_btn: '¡Que comiencen los juegos! ⚽',
     welcome_footer: 'Vuelve cuando quieras con el mismo nombre',
@@ -97,7 +97,7 @@ const I18N = {
     quiniela_results_desc: 'Ingresa los marcadores a medida que terminan los partidos.',
     save_awards_results: '💾 Guardar Resultados Premios',
     save_quiniela_results: '💾 Guardar Resultados Partidos',
-    quiniela_desc: 'Predice el marcador de cada partido. Fase de grupos: ganador = 3pts. Eliminatorias: marcador exacto = 5pts, ganador correcto = 3pts.',
+    quiniela_desc: 'Predice el marcador de cada partido. Ganador +3pts, goles de cada equipo +3pts, marcador exacto +3pts. Máx 12 por partido.',
     save_quiniela: '⚽ Guardar Picks', quiniela_note: 'Guarda seguido — tus picks se actualizan',
     all_games: 'Todos los Partidos', group_stage: 'Fase de Grupos',
     round_32: 'Ronda de 32', round_16: 'Octavos de Final',
@@ -694,8 +694,10 @@ function renderQuinielaGrid() {
       pts = scoreGame(pick, result, game.phase);
     }
 
+    const tip = getMatchTip(game.home, game.away);
+
     const div = document.createElement('div');
-    div.className = 'q-game' + (pick.homeGoals!==undefined?'  has-pick':'') + (pts===5?' exact-match':pts===3?' correct-winner':'');
+    div.className = 'q-game' + (pick.homeGoals!==undefined?' has-pick':'') + (pts>=12?' exact-match':pts>=3?' correct-winner':'');
     div.innerHTML = `
       <div class="q-team home">${esc(game.home)}</div>
       <div class="q-score-wrap">
@@ -706,9 +708,10 @@ function renderQuinielaGrid() {
         <input class="q-score-input" type="number" min="0" max="20"
           id="q-a-${game.id}" value="${pick.awayGoals??''}" placeholder="${t('away_placeholder')}"
           data-game="${game.id}" data-side="a"/>
-        ${result ? `<span class="q-result-badge ${pts===5?'q-pts-5':pts===3?'q-pts-3':'q-pts-0'}">${result.homeGoals}–${result.awayGoals} ${pts!==null?'(+'+pts+')':''}</span>` : ''}
+        ${result ? `<span class="q-result-badge ${pts>=12?'q-pts-12':pts>=6?'q-pts-6':pts>=3?'q-pts-3':'q-pts-0'}">${result.homeGoals}–${result.awayGoals} ${pts!==null?'(+'+pts+')':''}</span>` : ''}
       </div>
       <div class="q-team away">${esc(game.away)}</div>
+      ${!result && tip ? `<div class="q-tip">${tip}</div>` : ''}
     `;
     grid.appendChild(div);
   });
@@ -1157,10 +1160,16 @@ function scoreGame(pick, result, phase) {
   const ph = parseInt(pick.homeGoals), pa = parseInt(pick.awayGoals);
   const rh = parseInt(result.homeGoals), ra = parseInt(result.awayGoals);
   if (isNaN(ph)||isNaN(pa)||isNaN(rh)||isNaN(ra)) return null;
-  // Exact score = 5 pts (any phase)
-  if (ph===rh && pa===ra) return 5;
-  // Correct winner/draw = 3 pts
-  return getOutcome(ph,pa) === getOutcome(rh,ra) ? 3 : 0;
+  let pts = 0;
+  // 3 pts — correct winner/draw
+  if (getOutcome(ph,pa) === getOutcome(rh,ra)) pts += 3;
+  // 3 pts — guessed home team's exact goals
+  if (ph === rh) pts += 3;
+  // 3 pts — guessed away team's exact goals
+  if (pa === ra) pts += 3;
+  // 3 pts — exact full score bonus
+  if (ph === rh && pa === ra) pts += 3;
+  return pts;  // max 12 per game
 }
 function getOutcome(h,a) { return h>a?'H':h<a?'A':'D'; }
 
@@ -1361,7 +1370,7 @@ const EMAIL_TEMPLATES = {
       <h2>⚽ Welcome to Copa 26!</h2>
       <p>The World Cup 2026 starts <strong>tomorrow, June 11</strong> with Mexico vs South Africa!</p>
       <p>Make sure your predictions are in before kickoff — once a game starts, your pick locks. 🔒</p>
-      <div class="banner">🎯 Scoring: <strong>3 pts</strong> for correct winner · <strong>5 pts</strong> for exact score (knockouts)</div>
+      <div class="banner">🎯 Scoring: Winner <strong>+3</strong> · Each team's goals <strong>+3</strong> · Exact score <strong>+3</strong> · Max <strong>12/game</strong></div>
       <p>Good luck to everyone — and remember: <em>no crying in quiniela.</em></p>
       ${buildStandingsHtml(lb)}
     `,
@@ -1455,6 +1464,61 @@ document.getElementById('btn-send-blast')?.addEventListener('click', async () =>
   } catch(e) { showToast('❌ ' + e.message); }
   btn.disabled = false; btn.textContent = '📨 Send Email';
 });
+
+// ── MATCH PREDICTIONS / TIPS ──────────────────────────────────────────────────
+// FIFA ranking tiers + predicted scores based on strength gap
+const TEAM_STRENGTH = {
+  'Argentina':95,'France':94,'Brazil':92,'England':91,'Spain':91,'Germany':90,'Portugal':90,
+  'Netherlands':88,'Belgium':87,'Italy':86,'Croatia':86,'Colombia':85,'Uruguay':85,
+  'USA':83,'Mexico':82,'Switzerland':82,'Japan':82,'Senegal':81,'Morocco':81,
+  'Denmark':81,'Austria':80,'Turkiye':80,'Serbia':79,'Ecuador':79,'Wales':78,
+  'Iran':78,'Australia':77,'South Korea':77,'Korea Republic':77,'Canada':77,
+  'Tunisia':76,'Ivory Coast':76,'Cameroon':76,'Nigeria':76,'Saudi Arabia':75,
+  'Ghana':75,'Egypt':75,'Algeria':75,'Paraguay':74,'Bosnia and Herzegovina':74,
+  'Scotland':74,'Norway':74,'Sweden':74,'Czechia':73,'Panama':72,'DR Congo':72,
+  'Jordan':70,'Uzbekistan':70,'Iraq':70,'New Zealand':68,'Curacao':65,
+  'Haiti':64,'Cabo Verde':64,'South Africa':72,
+};
+
+function getMatchTip(home, away) {
+  const hStr = TEAM_STRENGTH[home] || 70;
+  const aStr = TEAM_STRENGTH[away] || 70;
+  const diff = hStr - aStr;
+  const isEs = currentLang === 'es';
+
+  let prediction, confidence;
+
+  if (Math.abs(diff) <= 3) {
+    // Very close — predict draw or slim win
+    if (diff >= 0) {
+      prediction = '1-1';
+      confidence = isEs ? 'Parejo' : 'Toss-up';
+    } else {
+      prediction = '0-1';
+      confidence = isEs ? 'Parejo' : 'Toss-up';
+    }
+  } else if (diff > 3 && diff <= 8) {
+    prediction = '1-0';
+    confidence = isEs ? `Ligera ventaja ${home}` : `Slight edge ${home}`;
+  } else if (diff > 8 && diff <= 15) {
+    prediction = '2-0';
+    confidence = isEs ? `Favorito: ${home}` : `Favored: ${home}`;
+  } else if (diff > 15) {
+    prediction = '3-0';
+    confidence = isEs ? `Gran favorito: ${home}` : `Strong favorite: ${home}`;
+  } else if (diff < -3 && diff >= -8) {
+    prediction = '0-1';
+    confidence = isEs ? `Ligera ventaja ${away}` : `Slight edge ${away}`;
+  } else if (diff < -8 && diff >= -15) {
+    prediction = '0-2';
+    confidence = isEs ? `Favorito: ${away}` : `Favored: ${away}`;
+  } else {
+    prediction = '0-3';
+    confidence = isEs ? `Gran favorito: ${away}` : `Strong favorite: ${away}`;
+  }
+
+  return `💡 ${confidence} · ${isEs ? 'Sugerencia' : 'Tip'}: <strong>${prediction}</strong>`;
+}
 
 // ── GO ────────────────────────────────────────────────────────────────────────
 init();
