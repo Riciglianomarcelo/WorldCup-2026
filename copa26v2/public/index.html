@@ -103,6 +103,7 @@
     <div class="nav-tabs" id="nav-tabs">
       <button class="tab-btn active" data-tab="leaderboard" data-i18n="tab_leaderboard">🏆 Leaderboard</button>
       <button class="tab-btn" data-tab="race">📈 Race</button>
+      <button class="tab-btn" data-tab="groups">🌍 Groups</button>
       <button class="tab-btn" data-tab="awards" data-i18n="tab_awards">⭐ Awards</button>
       <button class="tab-btn" data-tab="quiniela" data-i18n="tab_quiniela">⚽ Quiniela</button>
       <button class="tab-btn" data-tab="everyone">👀 Everyone</button>
@@ -145,6 +146,14 @@
       <button onclick="loadRace()" class="btn-ghost">↻ Refresh</button>
     </div>
     <div id="race-content"></div>
+  </div>
+
+  <div id="tab-groups" class="tab hidden">
+    <div class="tab-header">
+      <h2>🌍 <span data-i18n="groups_title">Group Standings</span></h2>
+      <button onclick="loadGroups()" class="btn-ghost">↻ Refresh</button>
+    </div>
+    <div id="groups-content"></div>
   </div>
 
   <div id="tab-awards" class="tab hidden">
@@ -252,6 +261,7 @@
       </div>
       <div style="display:flex;gap:8px;flex:0 0 auto">
         <button id="btn-test-email" class="btn-ghost" style="border-color:var(--text-3);color:var(--text-3)">📧 Test email</button>
+        <button id="btn-send-blast" class="btn-ghost" style="border-color:#00C853;color:#00C853">📨 Send Welcome Email</button>
         <button id="btn-sync-now" class="btn-ghost">⚡ Sync Now</button>
       </div>
     </div>
