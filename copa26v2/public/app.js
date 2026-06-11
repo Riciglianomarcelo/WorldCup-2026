@@ -1157,12 +1157,10 @@ function scoreGame(pick, result, phase) {
   const ph = parseInt(pick.homeGoals), pa = parseInt(pick.awayGoals);
   const rh = parseInt(result.homeGoals), ra = parseInt(result.awayGoals);
   if (isNaN(ph)||isNaN(pa)||isNaN(rh)||isNaN(ra)) return null;
-  if (phase === 'group') {
-    return getOutcome(ph,pa) === getOutcome(rh,ra) ? 3 : 0;
-  } else {
-    if (ph===rh && pa===ra) return 5;
-    return getOutcome(ph,pa) === getOutcome(rh,ra) ? 3 : 0;
-  }
+  // Exact score = 5 pts (any phase)
+  if (ph===rh && pa===ra) return 5;
+  // Correct winner/draw = 3 pts
+  return getOutcome(ph,pa) === getOutcome(rh,ra) ? 3 : 0;
 }
 function getOutcome(h,a) { return h>a?'H':h<a?'A':'D'; }
 
