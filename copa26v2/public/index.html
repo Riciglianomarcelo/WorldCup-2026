@@ -89,34 +89,36 @@
 <div id="page-app" class="page">
 
   <nav class="nav">
-    <div class="nav-logo">
-      <svg viewBox="0 0 36 36" width="32" height="32" role="img" aria-label="Copa 26">
-        <circle cx="18" cy="18" r="17" fill="#080d08" stroke="#C9A84C" stroke-width="0.6" opacity="0.8"/>
-        <path d="M 20.4,4.2 A 14,14 0 0,1 31.2,22.8" fill="none" stroke="#CC2429" stroke-width="2.4" stroke-linecap="round"/>
-        <path d="M 28.7,27.0 A 14,14 0 0,1 7.3,27.0"  fill="none" stroke="#1B55B8" stroke-width="2.4" stroke-linecap="round"/>
-        <path d="M 4.8,22.8 A 14,14 0 0,1 15.6,4.2"   fill="none" stroke="#00C853" stroke-width="2.4" stroke-linecap="round"/>
-        <circle cx="18" cy="18" r="9" fill="#080d08"/>
-        <text x="18" y="18" text-anchor="middle" dominant-baseline="middle" font-family="'Bebas Neue',sans-serif" font-size="8" fill="#ffffff">26</text>
-      </svg>
-      <span class="nav-wordmark">COPA 26</span>
+    <div class="nav-top">
+      <div class="nav-logo">
+        <svg viewBox="0 0 36 36" width="32" height="32" role="img" aria-label="Copa 26">
+          <circle cx="18" cy="18" r="17" fill="#080d08" stroke="#C9A84C" stroke-width="0.6" opacity="0.8"/>
+          <path d="M 20.4,4.2 A 14,14 0 0,1 31.2,22.8" fill="none" stroke="#CC2429" stroke-width="2.4" stroke-linecap="round"/>
+          <path d="M 28.7,27.0 A 14,14 0 0,1 7.3,27.0"  fill="none" stroke="#1B55B8" stroke-width="2.4" stroke-linecap="round"/>
+          <path d="M 4.8,22.8 A 14,14 0 0,1 15.6,4.2"   fill="none" stroke="#00C853" stroke-width="2.4" stroke-linecap="round"/>
+          <circle cx="18" cy="18" r="9" fill="#080d08"/>
+          <text x="18" y="18" text-anchor="middle" dominant-baseline="middle" font-family="'Bebas Neue',sans-serif" font-size="8" fill="#ffffff">26</text>
+        </svg>
+        <span class="nav-wordmark">COPA 26</span>
+      </div>
+      <div class="nav-right">
+        <button class="lang-btn" data-lang="en">EN</button>
+        <button class="lang-btn" data-lang="es">ES</button>
+        <button id="theme-btn" class="icon-btn">🌙</button>
+        <span id="nav-avatar"></span>
+        <span id="nav-name" class="nav-name"></span>
+        <button id="logout-btn" class="btn-ghost" data-i18n="logout">← Out</button>
+      </div>
     </div>
     <div class="nav-tabs" id="nav-tabs">
-      <button class="tab-btn active" data-tab="leaderboard" data-i18n="tab_leaderboard">🏆 Leaderboard</button>
-      <button class="tab-btn" data-tab="race">📈 Race</button>
-      <button class="tab-btn" data-tab="groups">🌍 Groups</button>
-      <button class="tab-btn" data-tab="awards" data-i18n="tab_awards">⭐ Awards</button>
-      <button class="tab-btn" data-tab="quiniela" data-i18n="tab_quiniela">⚽ Quiniela</button>
-      <button class="tab-btn" data-tab="everyone">👀 Everyone</button>
-      <button class="tab-btn" data-tab="results" data-i18n="tab_results">📋 Results</button>
-      <button class="tab-btn" data-tab="admin" data-i18n="tab_admin">⚙️ Admin</button>
-    </div>
-    <div class="nav-right">
-      <button class="lang-btn" data-lang="en">EN</button>
-      <button class="lang-btn" data-lang="es">ES</button>
-      <button id="theme-btn" class="icon-btn">🌙</button>
-      <span id="nav-avatar"></span>
-      <span id="nav-name" class="nav-name"></span>
-      <button id="logout-btn" class="btn-ghost" data-i18n="logout">← Out</button>
+      <button class="tab-btn active" data-tab="leaderboard" data-i18n="tab_leaderboard"><span class="tab-icon">🏆</span><span class="tab-label">Board</span><span class="tab-label-full">Leaderboard</span></button>
+      <button class="tab-btn" data-tab="race"><span class="tab-icon">📈</span><span class="tab-label">Race</span><span class="tab-label-full">Race</span></button>
+      <button class="tab-btn" data-tab="groups"><span class="tab-icon">🌍</span><span class="tab-label">Groups</span><span class="tab-label-full">Groups</span></button>
+      <button class="tab-btn" data-tab="awards" data-i18n="tab_awards"><span class="tab-icon">⭐</span><span class="tab-label">Awards</span><span class="tab-label-full">Awards</span></button>
+      <button class="tab-btn" data-tab="quiniela" data-i18n="tab_quiniela"><span class="tab-icon">⚽</span><span class="tab-label">Quiniela</span><span class="tab-label-full">Quiniela</span></button>
+      <button class="tab-btn" data-tab="everyone"><span class="tab-icon">👀</span><span class="tab-label">All</span><span class="tab-label-full">Everyone</span></button>
+      <button class="tab-btn" data-tab="results" data-i18n="tab_results"><span class="tab-icon">📋</span><span class="tab-label">Results</span><span class="tab-label-full">Results</span></button>
+      <button class="tab-btn" data-tab="admin" data-i18n="tab_admin"><span class="tab-icon">⚙️</span><span class="tab-label">Admin</span><span class="tab-label-full">Admin</span></button>
     </div>
   </nav>
 
@@ -207,8 +209,17 @@
       <h2>👀 Everyone's Picks</h2>
       <button onclick="loadEveryone()" class="btn-ghost">↻ Refresh</button>
     </div>
-    <p class="everyone-hint">Picks reveal the moment each game kicks off. Before that, see who's ready.</p>
-    <div class="ev-filters" id="ev-filters"></div>
+    <div id="ev-scoreboard"></div>
+    <div class="ev-toolbar">
+      <div class="ev-filters" id="ev-filters"></div>
+      <div class="ev-legend">
+        <span class="ev-leg-item"><span class="ev-dot ev-dot-exact"></span>Exact (12)</span>
+        <span class="ev-leg-item"><span class="ev-dot ev-dot-correct"></span>Winner</span>
+        <span class="ev-leg-item"><span class="ev-dot ev-dot-partial"></span>Partial</span>
+        <span class="ev-leg-item"><span class="ev-dot ev-dot-wrong"></span>Wrong</span>
+        <span class="ev-leg-item"><span class="ev-dot ev-dot-pending"></span>Pending</span>
+      </div>
+    </div>
     <div id="everyone-content"></div>
   </div>
 
