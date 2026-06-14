@@ -139,7 +139,14 @@ function applyLang(lang) {
   document.querySelectorAll('[data-i18n]').forEach(el => {
     const k = el.dataset.i18n;
     const v = t(k);
-    if (v) el.textContent = v;
+    if (!v) return;
+    // Tab buttons: update only the full-label span, strip emoji prefix
+    const fullSpan = el.querySelector('.tab-label-full');
+    if (fullSpan) {
+      fullSpan.textContent = v.replace(/^[\p{Emoji}\s]+/u, '');
+      return;
+    }
+    el.textContent = v;
   });
   document.querySelectorAll('[data-i18n-placeholder]').forEach(el => {
     el.placeholder = t(el.dataset.i18nPlaceholder);
@@ -875,6 +882,7 @@ document.getElementById('save-quiniela-results-btn').addEventListener('click', a
 // ── EVERYONE'S PICKS (transparency) ───────────────────────────────────────────
 let evData = null;
 let evFilter = 'all';
+let evCollapsed = {};
 
 async function loadEveryone() {
   const content = document.getElementById('everyone-content');
@@ -883,100 +891,214 @@ async function loadEveryone() {
     const res = await authFetch('/api/picks/transparency');
     if (!res.ok) { content.innerHTML = '<p style="color:var(--red)">Could not load picks.</p>'; return; }
     evData = await res.json();
+    renderEvScoreboard();
     renderEvFilters();
     renderEveryone();
   } catch(e) { content.innerHTML = `<p style="color:var(--red)">${e.message}</p>`; }
+}
+
+function evScoreGame(pick, result) {
+  if (!pick || !result) return 0;
+  const ph = parseInt(pick.homeGoals), pa = parseInt(pick.awayGoals);
+  const rh = parseInt(result.homeGoals), ra = parseInt(result.awayGoals);
+  if (isNaN(ph) || isNaN(pa) || isNaN(rh) || isNaN(ra)) return 0;
+  let pts = 0;
+  const pOut = ph > pa ? 'H' : ph < pa ? 'A' : 'D';
+  const rOut = rh > ra ? 'H' : rh < ra ? 'A' : 'D';
+  if (pOut === rOut) pts += 3;
+  if (ph === rh) pts += 3;
+  if (pa === ra) pts += 3;
+  if (ph === rh && pa === ra) pts += 3;
+  return pts;
+}
+
+function renderEvScoreboard() {
+  const el = document.getElementById('ev-scoreboard');
+  if (!el || !evData) return;
+  const { players, games } = evData;
+  const scored = games.filter(g => g.locked && g.result);
+
+  const stats = players.map(p => {
+    let pts = 0, exact = 0, correct = 0, wrong = 0, pending = 0;
+    games.forEach(g => {
+      if (!g.locked) return;
+      const pick = g.playerPicks?.[p.id];
+      if (!g.result) { if (pick) pending++; return; }
+      if (!pick) { wrong++; return; }
+      const s = evScoreGame(pick, g.result);
+      pts += s;
+      if (s === 12) exact++;
+      else if (s >= 3) correct++;
+      else wrong++;
+    });
+    return { ...p, pts, exact, correct, wrong, pending };
+  });
+  stats.sort((a, b) => b.pts - a.pts);
+  const topPts = stats[0]?.pts || 0;
+
+  el.innerHTML = '<div class="ev-scoreboard">' + stats.map(s => {
+    const isLeader = s.pts > 0 && s.pts === topPts;
+    return `<div class="ev-sb-card${isLeader ? ' ev-sb-leader' : ''}">
+      <div class="ev-sb-avatar">${s.avatar}</div>
+      <div class="ev-sb-name">${s.name.split(' ')[0]}</div>
+      <div class="ev-sb-pts">${s.pts}</div>
+      <div class="ev-sb-stats">
+        <span class="ev-sb-stat" title="Exact 12pt">🎯<b>${s.exact}</b></span>
+        <span class="ev-sb-stat" title="Correct">✓<b>${s.correct}</b></span>
+        <span class="ev-sb-stat" title="Wrong">✗<b>${s.wrong}</b></span>
+      </div>
+    </div>`;
+  }).join('') + '</div>';
 }
 
 function renderEvFilters() {
   const el = document.getElementById('ev-filters'); if (!el) return;
   const groups = [...new Set(evData.games.filter(g => g.phase === 'group').map(g => g.group))].sort();
   let html = `<button class="ev-filter-btn ${evFilter==='all'?'active':''}" onclick="setEvFilter('all')">All</button>`;
+  html += `<button class="ev-filter-btn ${evFilter==='today'?'active':''}" onclick="setEvFilter('today')">Today</button>`;
   groups.forEach(g => { html += `<button class="ev-filter-btn ${evFilter===g?'active':''}" onclick="setEvFilter('${g}')">Grp ${g}</button>`; });
-  html += `<button class="ev-filter-btn ${evFilter==='ko'?'active':''}" onclick="setEvFilter('ko')">Knockouts</button>`;
+  html += `<button class="ev-filter-btn ${evFilter==='ko'?'active':''}" onclick="setEvFilter('ko')">KO</button>`;
   el.innerHTML = html;
 }
 
 function setEvFilter(f) { evFilter = f; renderEvFilters(); renderEveryone(); }
+function toggleEvDay(key) {
+  evCollapsed[key] = !evCollapsed[key];
+  const hdr = document.querySelector(`[data-ev-day="${key}"]`);
+  const body = document.querySelector(`[data-ev-body="${key}"]`);
+  if (hdr) hdr.classList.toggle('collapsed', evCollapsed[key]);
+  if (body) body.classList.toggle('collapsed', evCollapsed[key]);
+}
 
 function renderEveryone() {
   const content = document.getElementById('everyone-content'); if (!content || !evData) return;
   const { players, games } = evData;
-  const fmtKo = ko => ko ? new Date(ko).toLocaleString(undefined, { month:'short', day:'numeric', hour:'2-digit', minute:'2-digit', timeZoneName:'short' }) : 'TBD';
+  const now = new Date();
+  const todayStr = now.toISOString().slice(0, 10);
 
-  let filtered = evFilter === 'all' ? games
-    : evFilter === 'ko' ? games.filter(g => g.phase !== 'group')
-    : games.filter(g => g.group === evFilter);
+  // Filter games
+  let filtered;
+  if (evFilter === 'all') filtered = games;
+  else if (evFilter === 'ko') filtered = games.filter(g => g.phase !== 'group');
+  else if (evFilter === 'today') filtered = games.filter(g => g.kickoff && g.kickoff.slice(0, 10) === todayStr);
+  else filtered = games.filter(g => g.group === evFilter);
 
-  const locked   = filtered.filter(g => g.locked);
-  const upcoming = filtered.filter(g => !g.locked);
-  let html = '';
-
-  // ── Locked: full picks revealed ──
-  if (locked.length) {
-    html += `<div class="ev-section-head">🔓 Picks Revealed <span class="ev-count">${locked.length}</span></div>`;
-    locked.forEach(g => {
-      html += `<div class="ev-card ev-card-open">`;
-      html += `<div class="ev-card-head">`;
-      html += `<span class="ev-group-badge">${g.phase==='group'?'Group '+g.group:g.id}</span>`;
-      html += `<span class="ev-matchup">${g.home} <span class="ev-vs">vs</span> ${g.away}</span>`;
-      html += g.result
-        ? `<span class="ev-result-badge">⚽ ${g.result.homeGoals}–${g.result.awayGoals}</span>`
-        : `<span class="ev-kickoff">🕐 ${fmtKo(g.kickoff)}</span>`;
-      html += `</div><div class="ev-picks-row">`;
-      players.forEach(p => {
-        const pick = g.playerPicks[p.id];
-        let cls = 'ev-no-pick', label = '—';
-        if (pick) {
-          label = `${pick.homeGoals}–${pick.awayGoals}`; cls = 'ev-has-pick';
-          if (g.result) {
-            const hg = +pick.homeGoals, ag = +pick.awayGoals, rh = +g.result.homeGoals, ra = +g.result.awayGoals;
-            if (hg === rh && ag === ra) cls = 'ev-exact';
-            else { const pw = hg>ag?'H':hg<ag?'A':'D', rw = rh>ra?'H':rh<ra?'A':'D'; cls = pw===rw ? 'ev-correct' : 'ev-wrong'; }
-          }
-        }
-        html += `<div class="ev-player-col"><div class="ev-player-av">${p.avatar}</div>`;
-        html += `<div class="ev-player-name">${p.name.split(' ')[0]}</div>`;
-        html += `<div class="ev-pick-score ${cls}">${label}</div></div>`;
-      });
-      html += `</div></div>`;
-    });
-  }
-
-  // ── Upcoming: submission status only ──
-  if (upcoming.length) {
-    const toShow = evFilter === 'all' ? upcoming.slice(0, 12) : upcoming;
-    html += `<div class="ev-section-head">⏳ Picks Hidden Until Kickoff <span class="ev-count">${upcoming.length}</span></div>`;
-    toShow.forEach(g => {
-      html += `<div class="ev-card"><div class="ev-card-head">`;
-      html += `<span class="ev-group-badge muted">${g.phase==='group'?'Group '+g.group:g.id}</span>`;
-      html += `<span class="ev-matchup">${g.home} <span class="ev-vs">vs</span> ${g.away}</span>`;
-      html += `<span class="ev-kickoff">🔒 ${fmtKo(g.kickoff)}</span>`;
-      html += `</div><div class="ev-submitted-row">`;
-      players.forEach(p => {
-        const sub = g.submitted?.includes(p.id);
-        html += `<div class="ev-sub-player ${sub?'sub-yes':'sub-no'}" title="${p.name}">`;
-        html += `<span class="ev-player-av-sm">${p.avatar}</span>`;
-        html += `<span class="ev-sub-dot">${sub?'✓':'○'}</span></div>`;
-      });
-      html += `</div><p class="ev-hidden-hint">Scores hidden until kickoff</p></div>`;
-    });
-    if (evFilter === 'all' && upcoming.length > 12)
-      html += `<p class="ev-more">+${upcoming.length - 12} more — pick a group filter above to see them</p>`;
-  }
-
-  // ── Placeholder: before tournament starts ──
-  if (!locked.length) {
-    const placeholder = `<div class="ev-placeholder">
+  // Check if tournament has started
+  const hasLocked = games.some(g => g.locked);
+  if (!hasLocked && evFilter !== 'today') {
+    content.innerHTML = `<div class="ev-placeholder">
       <div class="ev-placeholder-icon">🔒</div>
       <div class="ev-placeholder-title">Picks reveal on June 11</div>
       <div class="ev-placeholder-sub">The moment the first game kicks off, everyone's predictions appear here automatically. Come back after the opening whistle.</div>
     </div>`;
-    html = placeholder + html;
+    return;
   }
 
-  if (!locked.length && !upcoming.length)
-    html = '<p class="ev-empty">No games match this filter.</p>';
+  if (!filtered.length) {
+    content.innerHTML = '<p class="ev-empty">No games match this filter.</p>';
+    return;
+  }
+
+  // Group by date
+  const dayMap = new Map();
+  filtered.forEach(g => {
+    const dayKey = g.kickoff ? g.kickoff.slice(0, 10) : 'TBD';
+    if (!dayMap.has(dayKey)) dayMap.set(dayKey, []);
+    dayMap.get(dayKey).push(g);
+  });
+
+  // Sort days chronologically
+  const sortedDays = [...dayMap.entries()].sort((a, b) => a[0].localeCompare(b[0]));
+
+  // Default collapse: past days collapsed (unless filter is specific group/today), today + future open
+  if (evFilter === 'all') {
+    sortedDays.forEach(([dayKey]) => {
+      if (!(dayKey in evCollapsed)) {
+        evCollapsed[dayKey] = dayKey < todayStr;
+      }
+    });
+  }
+
+  let html = '';
+
+  sortedDays.forEach(([dayKey, dayGames]) => {
+    const isCollapsed = evCollapsed[dayKey] === true;
+    const dayDate = dayKey === 'TBD' ? 'TBD' : new Date(dayKey + 'T12:00:00Z');
+    const dayLabel = dayKey === 'TBD' ? 'TBD'
+      : dayDate.toLocaleDateString(undefined, { weekday: 'short', month: 'short', day: 'numeric' });
+    const isToday = dayKey === todayStr;
+    const lockedCount = dayGames.filter(g => g.locked).length;
+    const resultCount = dayGames.filter(g => g.result).length;
+
+    let badge = '';
+    if (isToday) badge = ' 🟢 TODAY';
+    else if (resultCount === dayGames.length) badge = ` · ${resultCount} played`;
+    else if (lockedCount > 0) badge = ` · ${resultCount}/${dayGames.length} results`;
+
+    html += `<div class="ev-day-section">`;
+    html += `<div class="ev-day-header${isCollapsed ? ' collapsed' : ''}" data-ev-day="${dayKey}" onclick="toggleEvDay('${dayKey}')">`;
+    html += `<span class="ev-day-chevron">▼</span>`;
+    html += `<span class="ev-day-label">${dayLabel}<small>${dayGames.length} games${badge}</small></span>`;
+    html += `</div>`;
+    html += `<div class="ev-day-body${isCollapsed ? ' collapsed' : ''}" data-ev-body="${dayKey}">`;
+
+    // Build table
+    html += `<table class="ev-table"><thead><tr>`;
+    html += `<th style="text-align:left;min-width:160px">Match</th>`;
+    html += `<th>Result</th>`;
+    players.forEach(p => {
+      html += `<th class="ev-player-th"><div class="ev-player-th-inner"><span class="ev-player-th-av">${p.avatar}</span><span class="ev-player-th-name">${p.name.split(' ')[0]}</span></div></th>`;
+    });
+    html += `</tr></thead><tbody>`;
+
+    dayGames.forEach(g => {
+      const grpLabel = g.phase === 'group' ? `Grp ${g.group}` : g.id;
+      html += `<tr${!g.locked ? ' class="ev-upcoming-row"' : ''}>`;
+      // Match info
+      html += `<td><div class="ev-match-cell"><span class="ev-grp-badge">${grpLabel}</span><span class="ev-teams">${g.home} <span class="ev-vs">v</span> ${g.away}</span></div></td>`;
+      // Result
+      html += `<td class="ev-result-cell">`;
+      if (g.result) {
+        html += `<span class="ev-official">${g.result.homeGoals}–${g.result.awayGoals}</span>`;
+      } else if (g.locked) {
+        html += `<span class="ev-live">LIVE</span>`;
+      } else {
+        const t = g.kickoff ? new Date(g.kickoff).toLocaleTimeString(undefined, { hour: '2-digit', minute: '2-digit' }) : '—';
+        html += `<span class="ev-no-result">🔒 ${t}</span>`;
+      }
+      html += `</td>`;
+
+      // Player picks
+      players.forEach(p => {
+        if (!g.locked) {
+          // Not started: show submitted badge
+          const sub = g.submitted?.includes(p.id);
+          html += `<td class="ev-pick-cell"><span class="ev-sub-badge ${sub ? 'ev-sub-yes' : 'ev-sub-no'}">${sub ? '✓' : '·'}</span></td>`;
+        } else {
+          const pick = g.playerPicks?.[p.id];
+          if (!pick) {
+            html += `<td class="ev-pick-cell ev-c-nopick">—</td>`;
+          } else {
+            const score = `${pick.homeGoals}–${pick.awayGoals}`;
+            if (!g.result) {
+              html += `<td class="ev-pick-cell ev-c-pending">${score}</td>`;
+            } else {
+              const pts = evScoreGame(pick, g.result);
+              let cls = 'ev-c-wrong';
+              if (pts === 12) cls = 'ev-c-exact';
+              else if (pts >= 6) cls = 'ev-c-correct';
+              else if (pts >= 3) cls = 'ev-c-partial';
+              html += `<td class="ev-pick-cell ${cls}">${score}${pts > 0 ? `<span class="ev-pts-sub">+${pts}</span>` : ''}</td>`;
+            }
+          }
+        }
+      });
+
+      html += `</tr>`;
+    });
+
+    html += `</tbody></table></div></div>`;
+  });
 
   content.innerHTML = html;
 }
