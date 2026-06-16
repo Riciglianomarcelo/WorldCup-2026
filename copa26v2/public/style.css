@@ -588,13 +588,22 @@ body { background: var(--bg); color: var(--text); font-family: var(--font); min-
 
 /* ═══ DATE-BASED FILTER BAR (Quiniela + Results) ═══ */
 .q-filter-bar {
-  display: flex; gap: 6px; overflow-x: auto; padding: 8px 0 12px;
+  display: flex; gap: 6px; overflow-x: auto; padding: 10px 12px;
   -webkit-overflow-scrolling: touch; scrollbar-width: none;
+  background: var(--surface); border: 1px solid var(--border);
+  border-radius: 10px; margin-bottom: 12px;
+  position: sticky; top: 0; z-index: 10;
 }
 .q-filter-bar::-webkit-scrollbar { display: none; }
+.q-filter-bar .ev-filter-btn {
+  white-space: nowrap; flex-shrink: 0;
+}
 .q-filter-sep {
   display: flex; align-items: center; color: var(--text-3); font-size: 13px;
-  padding: 0 4px; user-select: none;
+  padding: 0 4px; user-select: none; flex-shrink: 0;
+}
+.q-today-btn:not(.active) {
+  border-color: var(--green); color: var(--green); font-weight: 600;
 }
 
 /* ═══ MATCHDAY HEADERS (Quiniela + Results) ═══ */
