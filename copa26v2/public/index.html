@@ -77,7 +77,7 @@
     <div class="welcome-rules">
       <div data-i18n="rule1">🏅 <b>Awards</b> — Pick 1st/2nd/3rd for 8 categories (Golden Boot, Champion, etc.)</div>
       <div data-i18n="rule2">⚽ <b>Quiniela</b> — Predict results for all 104 World Cup games</div>
-      <div data-i18n="rule3">📊 <b>Scoring</b> — Winner +3 · Each team's goals +3 · Exact score +3 · Max 12 per game</div>
+      <div data-i18n="rule3">📊 <b>Scoring</b> — Exact score +5 · Correct winner +3 · One team right +1 · Max 5 per game</div>
       <div data-i18n="rule4">🏆 <b>Win</b> — Most total points = eternal bragging rights</div>
     </div>
     <button id="welcome-ok" class="btn-green btn-lg" data-i18n="welcome_btn">Let the games begin! ⚽</button>
@@ -175,27 +175,14 @@
   <div id="tab-quiniela" class="tab hidden">
     <div class="tab-header">
       <h2 data-i18n="tab_quiniela">⚽ Quiniela</h2>
-      <div class="quiniela-controls">
-        <select id="phase-filter" class="select-input">
-          <option value="all" data-i18n="all_games">All Games</option>
-          <option value="group" data-i18n="group_stage">Group Stage</option>
-          <option value="r32" data-i18n="round_32">Round of 32</option>
-          <option value="r16" data-i18n="round_16">Round of 16</option>
-          <option value="qf" data-i18n="quarterfinals">Quarter Finals</option>
-          <option value="sf" data-i18n="semifinals">Semi Finals</option>
-          <option value="final" data-i18n="final">Final</option>
-        </select>
-        <select id="group-filter" class="select-input">
-          <option value="all" data-i18n="all_groups">All Groups</option>
-        </select>
-        <button id="save-quiniela-btn" class="btn-green" data-i18n="save_quiniela">⚽ Save Picks</button>
-      </div>
+      <button id="save-quiniela-btn" class="btn-green" data-i18n="save_quiniela">⚽ Save Picks</button>
     </div>
-    <p class="tab-desc" data-i18n="quiniela_desc">Predict the score for every game. Group stage: predict winner (W/D/L) = 3pts. Knockouts: exact score = 5pts, correct winner = 3pts.</p>
+    <p class="tab-desc" data-i18n="quiniela_desc">Predict the score for every game. Exact score +5pts, correct winner/draw +3pts, one team's goals right +1pt. Max 5 per game.</p>
     <div id="quiniela-progress" class="progress-bar-wrap">
       <div id="quiniela-progress-fill" class="progress-bar-fill" style="width:0%"></div>
       <span id="quiniela-progress-label" class="progress-label">0 / 104</span>
     </div>
+    <div class="q-filter-bar" id="q-filter-bar"></div>
     <div id="quiniela-grid" class="quiniela-grid"></div>
     <div class="sticky-footer">
       <button id="save-quiniela-btn2" class="btn-green btn-lg" data-i18n="save_quiniela">⚽ Save All Picks</button>
@@ -213,9 +200,9 @@
     <div class="ev-toolbar">
       <div class="ev-filters" id="ev-filters"></div>
       <div class="ev-legend">
-        <span class="ev-leg-item"><span class="ev-dot ev-dot-exact"></span>Exact (12)</span>
-        <span class="ev-leg-item"><span class="ev-dot ev-dot-correct"></span>Winner</span>
-        <span class="ev-leg-item"><span class="ev-dot ev-dot-partial"></span>Partial</span>
+        <span class="ev-leg-item"><span class="ev-dot ev-dot-exact"></span>Exact (5)</span>
+        <span class="ev-leg-item"><span class="ev-dot ev-dot-correct"></span>Winner (3)</span>
+        <span class="ev-leg-item"><span class="ev-dot ev-dot-partial"></span>Partial (1)</span>
         <span class="ev-leg-item"><span class="ev-dot ev-dot-wrong"></span>Wrong</span>
         <span class="ev-leg-item"><span class="ev-dot ev-dot-pending"></span>Pending</span>
       </div>
@@ -242,15 +229,7 @@
 
     <div id="quiniela-results-panel" class="res-panel hidden">
       <p class="tab-desc" data-i18n="quiniela_results_desc">Enter scores as games finish. You can update anytime.</p>
-      <select id="result-phase-filter" class="select-input" style="margin-bottom:16px">
-        <option value="all">All Games</option>
-        <option value="group">Group Stage</option>
-        <option value="r32">Round of 32</option>
-        <option value="r16">Round of 16</option>
-        <option value="qf">Quarter Finals</option>
-        <option value="sf">Semi Finals</option>
-        <option value="final">Final</option>
-      </select>
+      <div class="q-filter-bar" id="qr-filter-bar"></div>
       <div id="quiniela-results-grid" class="quiniela-grid"></div>
       <div class="sticky-footer">
         <button id="save-quiniela-results-btn" class="btn-green btn-lg" data-i18n="save_quiniela_results">💾 Save Game Results</button>
