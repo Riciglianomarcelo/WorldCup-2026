@@ -658,7 +658,7 @@ async function loadMyQuinielaPicks() {
 }
 
 // ── QUINIELA: date-based filter + render ─────────────────────────────────────
-let qFilter = 'today';
+let qFilter = 'all';
 let qCollapsed = {};
 
 function buildDateFilters(barId, currentFilter, setFn) {
@@ -667,7 +667,8 @@ function buildDateFilters(barId, currentFilter, setFn) {
   const dates = [...new Set(ALL_GAMES.filter(g => g.kickoff).map(g => g.kickoff.slice(0, 10)))].sort();
   const groups = [...new Set(ALL_GAMES.filter(g => g.group).map(g => g.group))].sort();
   let html = `<button class="ev-filter-btn ${currentFilter==='all'?'active':''}" onclick="${setFn}('all')">All</button>`;
-  html += `<button class="ev-filter-btn ${currentFilter==='today'?'active':''}" onclick="${setFn}('today')">📅 Today</button>`;
+  html += `<button class="ev-filter-btn q-today-btn ${currentFilter==='today'?'active':''}" onclick="${setFn}('today')">📅 Today</button>`;
+  html += `<span class="q-filter-sep">|</span>`;
   dates.forEach(d => {
     const dt = new Date(d + 'T12:00:00Z');
     const label = dt.toLocaleDateString(undefined, { month: 'short', day: 'numeric' });
@@ -841,7 +842,7 @@ async function loadAwardsResultsPanel() {
 }
 
 // ── RESULTS: date-based rendering ────────────────────────────────────────────
-let qrFilter = 'today';
+let qrFilter = 'all';
 let qrCollapsed = {};
 
 function setQRFilter(f) { qrFilter = f; buildDateFilters('qr-filter-bar', qrFilter, 'setQRFilter'); renderQuinielaResultsGrid(); }
