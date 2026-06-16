@@ -323,23 +323,20 @@ async function runSync(trigger = 'auto') {
 
 
 // ─── SCORING ─────────────────────────────────────────────────────────────────
-// Group stage: predict W/D/L → 3 pts correct, 0 wrong
-// Knockout: predict exact score → 5 pts exact, 3 pts correct winner
+// Tiered scoring: 5 = exact score, 3 = correct outcome, 1 = one team's goals right (wrong outcome), 0 = miss
 function scoreGame(pick, result, phase) {
   if (!pick || !result) return 0;
   const ph = String(pick.homeGoals).trim(), pa = String(pick.awayGoals).trim();
   const rh = String(result.homeGoals).trim(), ra = String(result.awayGoals).trim();
   if (ph === '' || pa === '' || rh === '' || ra === '') return 0;
-  let pts = 0;
-  // 3 pts — correct winner/draw
-  if (getOutcome(ph, pa) === getOutcome(rh, ra)) pts += 3;
-  // 3 pts — guessed home team's exact goals
-  if (ph === rh) pts += 3;
-  // 3 pts — guessed away team's exact goals
-  if (pa === ra) pts += 3;
-  // 3 pts — exact full score bonus
-  if (ph === rh && pa === ra) pts += 3;
-  return pts;  // max 12 per game
+  // Exact score → 5 pts
+  if (ph === rh && pa === ra) return 5;
+  // Correct outcome (winner/draw) → 3 pts
+  if (getOutcome(ph, pa) === getOutcome(rh, ra)) return 3;
+  // One team's goals right but outcome wrong → 1 pt
+  if (ph === rh || pa === ra) return 1;
+  // Miss everything → 0
+  return 0;
 }
 
 function getOutcome(home, away) {
