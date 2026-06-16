@@ -473,7 +473,7 @@ body { background: var(--bg); color: var(--text); font-family: var(--font); min-
 .pick-row input::placeholder { color: var(--text-3); }
 
 /* ═══ QUINIELA GRID ═══ */
-.quiniela-controls { display: flex; gap: 8px; align-items: center; flex-wrap: wrap; }
+
 
 .select-input {
   background: var(--surface);
@@ -528,16 +528,16 @@ body { background: var(--bg); color: var(--text); font-family: var(--font); min-
   border: 1px solid var(--border);
   border-radius: var(--radius);
   padding: 10px 14px;
-  display: grid;
-  grid-template-columns: 1fr auto 1fr;
-  align-items: center;
-  gap: 10px;
+  display: flex; flex-direction: column;
+  gap: 2px;
   transition: border-color .15s;
+  margin: 6px 0;
 }
 .q-game:hover { border-color: var(--text-3); }
 .q-game.has-pick { border-left: 3px solid var(--green); }
 .q-game.exact-match { border-left: 3px solid var(--gold); background: rgba(234,179,8,.04); }
 .q-game.correct-winner { border-left: 3px solid var(--green); background: var(--green-glow); }
+.q-game.partial-match { border-left: 3px solid var(--blue); background: rgba(59,130,246,.04); }
 
 .q-team { font-size: 13px; font-weight: 600; }
 .q-team.home { text-align: right; }
@@ -581,10 +581,68 @@ body { background: var(--bg); color: var(--text); font-family: var(--font); min-
   border-radius: 4px;
   margin-left: 6px;
 }
-.q-pts-12 { background: rgba(234,179,8,.15); color: var(--gold); font-weight: 700; }
-.q-pts-6 { background: var(--green-glow); color: var(--green); }
-.q-pts-3 { background: rgba(59,130,246,.1); color: var(--blue); }
+.q-pts-5 { background: rgba(234,179,8,.15); color: var(--gold); font-weight: 700; }
+.q-pts-3 { background: var(--green-glow); color: var(--green); }
+.q-pts-1 { background: rgba(59,130,246,.1); color: var(--blue); }
 .q-pts-0 { background: rgba(239,68,68,.08); color: var(--red); }
+
+/* ═══ DATE-BASED FILTER BAR (Quiniela + Results) ═══ */
+.q-filter-bar {
+  display: flex; gap: 6px; overflow-x: auto; padding: 8px 0 12px;
+  -webkit-overflow-scrolling: touch; scrollbar-width: none;
+}
+.q-filter-bar::-webkit-scrollbar { display: none; }
+.q-filter-sep {
+  display: flex; align-items: center; color: var(--text-3); font-size: 13px;
+  padding: 0 4px; user-select: none;
+}
+
+/* ═══ MATCHDAY HEADERS (Quiniela + Results) ═══ */
+.q-day-header {
+  display: flex; align-items: center; gap: 8px;
+  padding: 10px 14px; margin: 12px 0 0;
+  background: var(--surface); border: 1px solid var(--border); border-radius: 10px;
+  cursor: pointer; user-select: none; transition: background .15s;
+}
+.q-day-header:first-child { margin-top: 0; }
+.q-day-header:hover { background: var(--hover); }
+.q-day-header .ev-day-chevron {
+  font-size: 11px; transition: transform .2s; color: var(--text-3);
+}
+.q-day-header.collapsed .ev-day-chevron { transform: rotate(-90deg); }
+.q-day-header .ev-day-label {
+  font-weight: 600; font-size: 14px; color: var(--text-1);
+  display: flex; align-items: center; gap: 8px;
+}
+.q-day-header .ev-day-label small {
+  font-weight: 400; font-size: 12px; color: var(--text-3);
+}
+
+/* ═══ MATCHDAY BODY ═══ */
+.q-day-body { padding: 0; transition: max-height .3s; }
+.q-day-body.collapsed { display: none; }
+
+/* ═══ GAME META ROW ═══ */
+.q-game-meta {
+  display: flex; align-items: center; gap: 8px;
+  padding: 0 0 4px; font-size: 12px; color: var(--text-3);
+}
+.q-grp-tag {
+  background: var(--surface); border: 1px solid var(--border);
+  border-radius: 4px; padding: 1px 6px; font-size: 11px; font-weight: 600;
+  color: var(--text-2); letter-spacing: .3px;
+}
+.q-kick-time { font-size: 12px; color: var(--text-2); font-weight: 500; }
+.q-lock-icon { font-size: 12px; }
+
+/* ═══ GAME ROW LAYOUT ═══ */
+.q-game-row {
+  display: grid; grid-template-columns: 1fr auto 1fr;
+  align-items: center; gap: 8px;
+}
+.q-game.q-locked { opacity: .6; }
+.q-game.q-locked .q-score-input { pointer-events: none; background: var(--surface); }
+.q-game.has-result { border-left: 3px solid var(--green); }
 
 /* ═══ RESULTS TABS ═══ */
 .results-tabs { display: flex; gap: 6px; margin-bottom: 20px; }
