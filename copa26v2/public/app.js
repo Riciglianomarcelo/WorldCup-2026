@@ -27,7 +27,7 @@ const I18N = {
     welcome_sub: "FIFA doesn't know about this. Let's keep it that way. 🤫",
     rule1: '🏅 Awards — Pick 1st/2nd/3rd for 8 categories (Golden Boot, Champion, etc.)',
     rule2: '⚽ Quiniela — Predict results for all 104 World Cup games',
-    rule3: '📊 Scoring — Winner +3 · Each team goals +3 · Exact score +3 · Max 12/game',
+    rule3: '📊 Scoring — Exact score +5 · Correct winner +3 · One team right +1 · Max 5/game',
     rule4: '🏆 Win — Most total points = eternal bragging rights',
     welcome_btn: 'Let the games begin! ⚽',
     welcome_footer: 'Come back anytime with the same name',
@@ -42,7 +42,7 @@ const I18N = {
     quiniela_results_desc: 'Enter scores as games finish. You can update anytime.',
     save_awards_results: '💾 Save Award Results',
     save_quiniela_results: '💾 Save Game Results',
-    quiniela_desc: 'Predict the score for every game. Winner +3pts, each team goals +3pts, exact score +3pts. Max 12 per game.',
+    quiniela_desc: 'Predict the score for every game. Exact score +5pts, correct winner/draw +3pts, one team\'s goals right +1pt. Max 5 per game.',
     save_quiniela: '⚽ Save Picks', quiniela_note: 'Save often — your picks auto-update',
     all_games: 'All Games', group_stage: 'Group Stage',
     round_32: 'Round of 32', round_16: 'Round of 16',
@@ -82,7 +82,7 @@ const I18N = {
     welcome_sub: "La FIFA no sabe que esto existe. Mejor así. 🤫",
     rule1: '🏅 Premios — Elige 1ro/2do/3ro en 8 categorías (Bota de Oro, Campeón, etc.)',
     rule2: '⚽ Quiniela — Predice los resultados de los 104 partidos del Mundial',
-    rule3: '📊 Puntuación — Ganador +3 · Goles equipo +3 · Marcador exacto +3 · Máx 12/partido',
+    rule3: '📊 Puntuación — Marcador exacto +5 · Ganador correcto +3 · Un equipo acertado +1 · Máx 5/partido',
     rule4: '🏆 Ganar — El que más puntos tenga = gloria eterna',
     welcome_btn: '¡Que comiencen los juegos! ⚽',
     welcome_footer: 'Vuelve cuando quieras con el mismo nombre',
@@ -97,7 +97,7 @@ const I18N = {
     quiniela_results_desc: 'Ingresa los marcadores a medida que terminan los partidos.',
     save_awards_results: '💾 Guardar Resultados Premios',
     save_quiniela_results: '💾 Guardar Resultados Partidos',
-    quiniela_desc: 'Predice el marcador de cada partido. Ganador +3pts, goles de cada equipo +3pts, marcador exacto +3pts. Máx 12 por partido.',
+    quiniela_desc: 'Predice el marcador de cada partido. Marcador exacto +5pts, ganador/empate correcto +3pts, goles de un equipo acertados +1pt. Máx 5 por partido.',
     save_quiniela: '⚽ Guardar Picks', quiniela_note: 'Guarda seguido — tus picks se actualizan',
     all_games: 'Todos los Partidos', group_stage: 'Fase de Grupos',
     round_32: 'Ronda de 32', round_16: 'Octavos de Final',
@@ -208,11 +208,6 @@ async function init() {
   document.getElementById('s-players').textContent = stats.totalUsers;
   document.getElementById('s-awards').textContent = stats.totalAwardsPicks;
   document.getElementById('s-quiniela').textContent = stats.totalQuinielaPicks;
-
-  // Populate group filter
-  const groups = [...new Set(ALL_GAMES.filter(g=>g.group).map(g=>g.group))].sort();
-  const gf = document.getElementById('group-filter');
-  groups.forEach(g => { const o = document.createElement('option'); o.value = g; o.textContent = `Group ${g}`; gf.appendChild(o); });
 
   // Check token
   const token = getToken();
@@ -325,7 +320,7 @@ document.getElementById('nav-tabs').addEventListener('click', e => {
   if (tab === 'everyone') loadEveryone();
   if (tab === 'results') { loadAwardsResultsPanel(); loadQuinielaResultsPanel(); }
   if (tab !== 'race' && racePlaying) { clearInterval(raceTimer); racePlaying = false; }
-  if (tab === 'quiniela') renderQuinielaGrid();
+  if (tab === 'quiniela') { buildDateFilters('q-filter-bar', qFilter, 'setQFilter'); renderQuinielaGrid(); }
   if (tab === 'awards') renderAwardsGrid();
 });
 
@@ -662,74 +657,131 @@ async function loadMyQuinielaPicks() {
   } catch(e) {}
 }
 
-function getFilteredGames() {
-  const phase = document.getElementById('phase-filter')?.value || 'all';
-  const group = document.getElementById('group-filter')?.value || 'all';
-  return ALL_GAMES.filter(g => {
-    if (phase !== 'all' && g.phase !== phase) return false;
-    if (group !== 'all' && g.group !== group) return false;
-    return true;
+// ── QUINIELA: date-based filter + render ─────────────────────────────────────
+let qFilter = 'today';
+let qCollapsed = {};
+
+function buildDateFilters(barId, currentFilter, setFn) {
+  const bar = document.getElementById(barId); if (!bar) return;
+  const todayStr = new Date().toISOString().slice(0, 10);
+  const dates = [...new Set(ALL_GAMES.filter(g => g.kickoff).map(g => g.kickoff.slice(0, 10)))].sort();
+  const groups = [...new Set(ALL_GAMES.filter(g => g.group).map(g => g.group))].sort();
+  let html = `<button class="ev-filter-btn ${currentFilter==='all'?'active':''}" onclick="${setFn}('all')">All</button>`;
+  html += `<button class="ev-filter-btn ${currentFilter==='today'?'active':''}" onclick="${setFn}('today')">📅 Today</button>`;
+  dates.forEach(d => {
+    const dt = new Date(d + 'T12:00:00Z');
+    const label = dt.toLocaleDateString(undefined, { month: 'short', day: 'numeric' });
+    const isToday = d === todayStr;
+    html += `<button class="ev-filter-btn ${currentFilter===d?'active':''}" onclick="${setFn}('${d}')">${isToday ? '🟢 ' : ''}${label}</button>`;
   });
+  html += `<span class="q-filter-sep">|</span>`;
+  groups.forEach(g => { html += `<button class="ev-filter-btn ${currentFilter==='grp-'+g?'active':''}" onclick="${setFn}('grp-${g}')">Grp ${g}</button>`; });
+  html += `<button class="ev-filter-btn ${currentFilter==='ko'?'active':''}" onclick="${setFn}('ko')">KO</button>`;
+  bar.innerHTML = html;
+}
+
+function filterGamesByQ(filter) {
+  const todayStr = new Date().toISOString().slice(0, 10);
+  if (filter === 'all') return ALL_GAMES;
+  if (filter === 'today') return ALL_GAMES.filter(g => g.kickoff && g.kickoff.slice(0, 10) === todayStr);
+  if (filter === 'ko') return ALL_GAMES.filter(g => g.phase !== 'group');
+  if (filter.startsWith('grp-')) return ALL_GAMES.filter(g => g.group === filter.slice(4));
+  return ALL_GAMES.filter(g => g.kickoff && g.kickoff.slice(0, 10) === filter);
+}
+
+function setQFilter(f) { qFilter = f; buildDateFilters('q-filter-bar', qFilter, 'setQFilter'); renderQuinielaGrid(); }
+
+function groupGamesByDate(games) {
+  const map = new Map();
+  games.forEach(g => { const dayKey = g.kickoff ? g.kickoff.slice(0, 10) : 'TBD'; if (!map.has(dayKey)) map.set(dayKey, []); map.get(dayKey).push(g); });
+  return [...map.entries()].sort((a, b) => a[0].localeCompare(b[0]));
+}
+
+function toggleQDay(key) {
+  qCollapsed[key] = !qCollapsed[key];
+  const hdr = document.querySelector(`[data-qday="${key}"]`);
+  const body = document.querySelector(`[data-qbody="${key}"]`);
+  if (hdr) hdr.classList.toggle('collapsed', qCollapsed[key]);
+  if (body) body.classList.toggle('collapsed', qCollapsed[key]);
 }
 
 function renderQuinielaGrid() {
   const grid = document.getElementById('quiniela-grid');
   grid.innerHTML = '';
-  const games = getFilteredGames();
-  let lastGroup = null;
+  const games = filterGamesByQ(qFilter);
+  const todayStr = new Date().toISOString().slice(0, 10);
 
-  games.forEach(game => {
-    // Group header
-    if (game.phase === 'group' && game.group !== lastGroup) {
-      lastGroup = game.group;
-      const hdr = document.createElement('div');
-      hdr.className = 'q-group-header';
-      hdr.textContent = (currentLang==='es' ? 'Grupo' : 'Group') + ' ' + game.group;
-      grid.appendChild(hdr);
-    } else if (game.phase !== 'group' && lastGroup !== game.phase) {
-      lastGroup = game.phase;
-      const hdr = document.createElement('div');
-      hdr.className = 'q-group-header';
-      hdr.textContent = currentLang==='es' ? game.labelEs : game.label;
-      grid.appendChild(hdr);
-    }
+  if (!games.length) {
+    grid.innerHTML = `<p class="ev-empty">${qFilter === 'today' ? 'No games scheduled today.' : 'No games match this filter.'}</p>`;
+    return;
+  }
 
-    const pick = myQuinielaPicks[game.id] || {};
-    const result = quinielaResults[game.id];
-    let pts = null;
-    if (result && pick.homeGoals !== undefined && pick.awayGoals !== undefined) {
-      pts = scoreGame(pick, result, game.phase);
-    }
+  const days = groupGamesByDate(games);
 
-    const tip = getMatchTip(game.home, game.away);
+  days.forEach(([dayKey, dayGames]) => {
+    const isToday = dayKey === todayStr;
+    const dayDate = dayKey === 'TBD' ? 'TBD' : new Date(dayKey + 'T12:00:00Z');
+    const dayLabel = dayKey === 'TBD' ? 'TBD' : dayDate.toLocaleDateString(undefined, { weekday: 'short', month: 'short', day: 'numeric' });
+    const collapseKey = 'q-' + dayKey;
+    if (qFilter === 'all' && !(collapseKey in qCollapsed)) { qCollapsed[collapseKey] = dayKey < todayStr; }
+    const isCollapsed = qFilter === 'all' && qCollapsed[collapseKey] === true;
 
-    const div = document.createElement('div');
-    div.className = 'q-game' + (pick.homeGoals!==undefined?' has-pick':'') + (pts>=12?' exact-match':pts>=3?' correct-winner':'');
-    div.innerHTML = `
-      <div class="q-team home">${esc(game.home)}</div>
-      <div class="q-score-wrap">
-        <input class="q-score-input" type="number" min="0" max="20"
-          id="q-h-${game.id}" value="${pick.homeGoals??''}" placeholder="${t('home_placeholder')}"
-          data-game="${game.id}" data-side="h"/>
-        <span class="q-dash">—</span>
-        <input class="q-score-input" type="number" min="0" max="20"
-          id="q-a-${game.id}" value="${pick.awayGoals??''}" placeholder="${t('away_placeholder')}"
-          data-game="${game.id}" data-side="a"/>
-        ${result ? `<span class="q-result-badge ${pts>=12?'q-pts-12':pts>=6?'q-pts-6':pts>=3?'q-pts-3':'q-pts-0'}">${result.homeGoals}–${result.awayGoals} ${pts!==null?'(+'+pts+')':''}</span>` : ''}
-      </div>
-      <div class="q-team away">${esc(game.away)}</div>
-      ${!result && tip ? `<div class="q-tip">${tip}</div>` : ''}
-    `;
-    grid.appendChild(div);
+    const filledCount = dayGames.filter(g => { const p = myQuinielaPicks[g.id]; return p && p.homeGoals !== '' && p.homeGoals !== undefined && p.awayGoals !== '' && p.awayGoals !== undefined; }).length;
+    const resultCount = dayGames.filter(g => quinielaResults[g.id]).length;
+    let badge = '';
+    if (isToday) badge = ' 🟢 TODAY';
+    if (resultCount > 0) badge += ` · ${resultCount}/${dayGames.length} results`;
+    badge += ` · ${filledCount}/${dayGames.length} picked`;
+
+    const hdr = document.createElement('div');
+    hdr.className = 'q-day-header' + (isCollapsed ? ' collapsed' : '');
+    hdr.dataset.qday = collapseKey;
+    hdr.onclick = () => toggleQDay(collapseKey);
+    hdr.innerHTML = `<span class="ev-day-chevron">▼</span><span class="ev-day-label">${dayLabel}<small>${dayGames.length} games${badge}</small></span>`;
+    grid.appendChild(hdr);
+
+    const body = document.createElement('div');
+    body.className = 'q-day-body' + (isCollapsed ? ' collapsed' : '');
+    body.dataset.qbody = collapseKey;
+
+    dayGames.forEach(game => {
+      const pick = myQuinielaPicks[game.id] || {};
+      const result = quinielaResults[game.id];
+      let pts = null;
+      if (result && pick.homeGoals !== undefined && pick.awayGoals !== undefined) { pts = scoreGame(pick, result, game.phase); }
+      const tip = getMatchTip(game.home, game.away);
+      const kickTime = game.kickoff ? new Date(game.kickoff).toLocaleTimeString(undefined, { hour: '2-digit', minute: '2-digit' }) : '';
+      const groupLabel = game.phase === 'group' ? `Grp ${game.group}` : game.id;
+
+      const div = document.createElement('div');
+      div.className = 'q-game' + (pick.homeGoals!==undefined?' has-pick':'') + (pts===5?' exact-match':pts>=3?' correct-winner':pts===1?' partial-match':'') + (game.locked?' q-locked':'');
+      div.innerHTML = `
+        <div class="q-game-meta"><span class="q-grp-tag">${groupLabel}</span>${kickTime ? `<span class="q-kick-time">${kickTime}</span>` : ''}${game.locked ? '<span class="q-lock-icon">🔒</span>' : ''}</div>
+        <div class="q-game-row">
+          <div class="q-team home">${esc(game.home)}</div>
+          <div class="q-score-wrap">
+            <input class="q-score-input" type="number" min="0" max="20"
+              id="q-h-${game.id}" value="${pick.homeGoals??''}" placeholder="${t('home_placeholder')}"
+              data-game="${game.id}" data-side="h"/>
+            <span class="q-dash">—</span>
+            <input class="q-score-input" type="number" min="0" max="20"
+              id="q-a-${game.id}" value="${pick.awayGoals??''}" placeholder="${t('away_placeholder')}"
+              data-game="${game.id}" data-side="a"/>
+            ${result ? `<span class="q-result-badge ${pts===5?'q-pts-5':pts===3?'q-pts-3':pts===1?'q-pts-1':'q-pts-0'}">${result.homeGoals}–${result.awayGoals} ${pts!==null?'(+'+pts+')':''}</span>` : ''}
+          </div>
+          <div class="q-team away">${esc(game.away)}</div>
+        </div>
+        ${!result && tip ? `<div class="q-tip">${tip}</div>` : ''}
+      `;
+      body.appendChild(div);
+    });
+    grid.appendChild(body);
   });
 
   updateProgress();
-
-  // Live update on input
   grid.querySelectorAll('.q-score-input').forEach(inp => {
     inp.addEventListener('change', () => {
-      const gameId = inp.dataset.game;
-      const side = inp.dataset.side;
+      const gameId = inp.dataset.game, side = inp.dataset.side;
       if (!myQuinielaPicks[gameId]) myQuinielaPicks[gameId] = {};
       if (side==='h') myQuinielaPicks[gameId].homeGoals = inp.value;
       else myQuinielaPicks[gameId].awayGoals = inp.value;
@@ -770,15 +822,6 @@ async function saveQuinielaPicks() {
 document.getElementById('save-quiniela-btn').addEventListener('click', saveQuinielaPicks);
 document.getElementById('save-quiniela-btn2').addEventListener('click', saveQuinielaPicks);
 
-// Phase + group filter
-document.getElementById('phase-filter').addEventListener('change', () => {
-  const phase = document.getElementById('phase-filter').value;
-  const gf = document.getElementById('group-filter');
-  gf.style.display = phase === 'group' || phase === 'all' ? '' : 'none';
-  renderQuinielaGrid();
-});
-document.getElementById('group-filter').addEventListener('change', renderQuinielaGrid);
-
 // ── RESULTS TABS ──────────────────────────────────────────────────────────────
 document.querySelectorAll('.res-tab-btn').forEach(btn => {
   btn.addEventListener('click', () => {
@@ -797,47 +840,91 @@ async function loadAwardsResultsPanel() {
   renderAwardsGrid(true);
 }
 
+// ── RESULTS: date-based rendering ────────────────────────────────────────────
+let qrFilter = 'today';
+let qrCollapsed = {};
+
+function setQRFilter(f) { qrFilter = f; buildDateFilters('qr-filter-bar', qrFilter, 'setQRFilter'); renderQuinielaResultsGrid(); }
+
+function toggleQRDay(key) {
+  qrCollapsed[key] = !qrCollapsed[key];
+  const hdr = document.querySelector(`[data-qday="${key}"]`);
+  const body = document.querySelector(`[data-qbody="${key}"]`);
+  if (hdr) hdr.classList.toggle('collapsed', qrCollapsed[key]);
+  if (body) body.classList.toggle('collapsed', qrCollapsed[key]);
+}
+
 async function loadQuinielaResultsPanel() {
   const res = await fetch('/api/quiniela/results');
   const data = await res.json();
   quinielaResults = data.results || {};
+  buildDateFilters('qr-filter-bar', qrFilter, 'setQRFilter');
   renderQuinielaResultsGrid();
 }
 
 function renderQuinielaResultsGrid() {
   const grid = document.getElementById('quiniela-results-grid');
-  const phase = document.getElementById('result-phase-filter')?.value || 'all';
-  const games = ALL_GAMES.filter(g => phase==='all' || g.phase===phase);
   grid.innerHTML = '';
-  let lastPhase = null;
+  const games = filterGamesByQ(qrFilter);
+  const todayStr = new Date().toISOString().slice(0, 10);
 
-  games.forEach(game => {
-    if (game.phase !== lastPhase) {
-      lastPhase = game.phase;
-      const hdr = document.createElement('div');
-      hdr.className = 'q-group-header';
-      hdr.textContent = currentLang==='es' ? game.labelEs : (game.group ? `Group ${game.group}` : game.label);
-      grid.appendChild(hdr);
-    }
-    const result = quinielaResults[game.id] || {};
-    const div = document.createElement('div');
-    div.className = 'q-game';
-    div.innerHTML = `
-      <div class="q-team home">${esc(game.home)}</div>
-      <div class="q-score-wrap">
-        <input class="q-score-input" type="number" min="0" max="20"
-          id="qr-h-${game.id}" value="${result.homeGoals??''}" placeholder="H"/>
-        <span class="q-dash">—</span>
-        <input class="q-score-input" type="number" min="0" max="20"
-          id="qr-a-${game.id}" value="${result.awayGoals??''}" placeholder="A"/>
-      </div>
-      <div class="q-team away">${esc(game.away)}</div>
-    `;
-    grid.appendChild(div);
+  if (!games.length) {
+    grid.innerHTML = `<p class="ev-empty">${qrFilter === 'today' ? 'No games scheduled today.' : 'No games match this filter.'}</p>`;
+    return;
+  }
+
+  const days = groupGamesByDate(games);
+  days.forEach(([dayKey, dayGames]) => {
+    const isToday = dayKey === todayStr;
+    const dayDate = dayKey === 'TBD' ? 'TBD' : new Date(dayKey + 'T12:00:00Z');
+    const dayLabel = dayKey === 'TBD' ? 'TBD' : dayDate.toLocaleDateString(undefined, { weekday: 'short', month: 'short', day: 'numeric' });
+    const collapseKey = 'qr-' + dayKey;
+    if (qrFilter === 'all' && !(collapseKey in qrCollapsed)) { qrCollapsed[collapseKey] = dayKey < todayStr; }
+    const isCollapsed = qrFilter === 'all' && qrCollapsed[collapseKey] === true;
+
+    const resultCount = dayGames.filter(g => quinielaResults[g.id]).length;
+    let badge = '';
+    if (isToday) badge = ' 🟢 TODAY';
+    badge += ` · ${resultCount}/${dayGames.length} entered`;
+
+    const hdr = document.createElement('div');
+    hdr.className = 'q-day-header' + (isCollapsed ? ' collapsed' : '');
+    hdr.dataset.qday = collapseKey;
+    hdr.onclick = () => toggleQRDay(collapseKey);
+    hdr.innerHTML = `<span class="ev-day-chevron">▼</span><span class="ev-day-label">${dayLabel}<small>${dayGames.length} games${badge}</small></span>`;
+    grid.appendChild(hdr);
+
+    const body = document.createElement('div');
+    body.className = 'q-day-body' + (isCollapsed ? ' collapsed' : '');
+    body.dataset.qbody = collapseKey;
+
+    dayGames.forEach(game => {
+      const result = quinielaResults[game.id] || {};
+      const kickTime = game.kickoff ? new Date(game.kickoff).toLocaleTimeString(undefined, { hour: '2-digit', minute: '2-digit' }) : '';
+      const groupLabel = game.phase === 'group' ? `Grp ${game.group}` : game.id;
+      const hasResult = result.homeGoals !== undefined && result.homeGoals !== '';
+
+      const div = document.createElement('div');
+      div.className = 'q-game' + (hasResult ? ' has-result' : '');
+      div.innerHTML = `
+        <div class="q-game-meta"><span class="q-grp-tag">${groupLabel}</span>${kickTime ? `<span class="q-kick-time">${kickTime}</span>` : ''}</div>
+        <div class="q-game-row">
+          <div class="q-team home">${esc(game.home)}</div>
+          <div class="q-score-wrap">
+            <input class="q-score-input" type="number" min="0" max="20"
+              id="qr-h-${game.id}" value="${result.homeGoals??''}" placeholder="H"/>
+            <span class="q-dash">—</span>
+            <input class="q-score-input" type="number" min="0" max="20"
+              id="qr-a-${game.id}" value="${result.awayGoals??''}" placeholder="A"/>
+          </div>
+          <div class="q-team away">${esc(game.away)}</div>
+        </div>
+      `;
+      body.appendChild(div);
+    });
+    grid.appendChild(body);
   });
 }
-
-document.getElementById('result-phase-filter').addEventListener('change', renderQuinielaResultsGrid);
 
 document.getElementById('save-awards-results-btn').addEventListener('click', async () => {
   const btn = document.getElementById('save-awards-results-btn');
@@ -902,14 +989,12 @@ function evScoreGame(pick, result) {
   const ph = parseInt(pick.homeGoals), pa = parseInt(pick.awayGoals);
   const rh = parseInt(result.homeGoals), ra = parseInt(result.awayGoals);
   if (isNaN(ph) || isNaN(pa) || isNaN(rh) || isNaN(ra)) return 0;
-  let pts = 0;
+  if (ph === rh && pa === ra) return 5;
   const pOut = ph > pa ? 'H' : ph < pa ? 'A' : 'D';
   const rOut = rh > ra ? 'H' : rh < ra ? 'A' : 'D';
-  if (pOut === rOut) pts += 3;
-  if (ph === rh) pts += 3;
-  if (pa === ra) pts += 3;
-  if (ph === rh && pa === ra) pts += 3;
-  return pts;
+  if (pOut === rOut) return 3;
+  if (ph === rh || pa === ra) return 1;
+  return 0;
 }
 
 function renderEvScoreboard() {
@@ -927,7 +1012,7 @@ function renderEvScoreboard() {
       if (!pick) { wrong++; return; }
       const s = evScoreGame(pick, g.result);
       pts += s;
-      if (s === 12) exact++;
+      if (s === 5) exact++;
       else if (s >= 3) correct++;
       else wrong++;
     });
@@ -943,7 +1028,7 @@ function renderEvScoreboard() {
       <div class="ev-sb-name">${s.name.split(' ')[0]}</div>
       <div class="ev-sb-pts">${s.pts}</div>
       <div class="ev-sb-stats">
-        <span class="ev-sb-stat" title="Exact 12pt">🎯<b>${s.exact}</b></span>
+        <span class="ev-sb-stat" title="Exact 5pt">🎯<b>${s.exact}</b></span>
         <span class="ev-sb-stat" title="Correct">✓<b>${s.correct}</b></span>
         <span class="ev-sb-stat" title="Wrong">✗<b>${s.wrong}</b></span>
       </div>
@@ -1085,9 +1170,9 @@ function renderEveryone() {
             } else {
               const pts = evScoreGame(pick, g.result);
               let cls = 'ev-c-wrong';
-              if (pts === 12) cls = 'ev-c-exact';
-              else if (pts >= 6) cls = 'ev-c-correct';
-              else if (pts >= 3) cls = 'ev-c-partial';
+              if (pts === 5) cls = 'ev-c-exact';
+              else if (pts === 3) cls = 'ev-c-correct';
+              else if (pts === 1) cls = 'ev-c-partial';
               html += `<td class="ev-pick-cell ${cls}">${score}${pts > 0 ? `<span class="ev-pts-sub">+${pts}</span>` : ''}</td>`;
             }
           }
@@ -1282,16 +1367,13 @@ function scoreGame(pick, result, phase) {
   const ph = parseInt(pick.homeGoals), pa = parseInt(pick.awayGoals);
   const rh = parseInt(result.homeGoals), ra = parseInt(result.awayGoals);
   if (isNaN(ph)||isNaN(pa)||isNaN(rh)||isNaN(ra)) return null;
-  let pts = 0;
-  // 3 pts — correct winner/draw
-  if (getOutcome(ph,pa) === getOutcome(rh,ra)) pts += 3;
-  // 3 pts — guessed home team's exact goals
-  if (ph === rh) pts += 3;
-  // 3 pts — guessed away team's exact goals
-  if (pa === ra) pts += 3;
-  // 3 pts — exact full score bonus
-  if (ph === rh && pa === ra) pts += 3;
-  return pts;  // max 12 per game
+  // Exact score → 5 pts
+  if (ph === rh && pa === ra) return 5;
+  // Correct outcome → 3 pts
+  if (getOutcome(ph,pa) === getOutcome(rh,ra)) return 3;
+  // One team's goals right but wrong outcome → 1 pt
+  if (ph === rh || pa === ra) return 1;
+  return 0;  // max 5 per game
 }
 function getOutcome(h,a) { return h>a?'H':h<a?'A':'D'; }
 
@@ -1492,7 +1574,7 @@ const EMAIL_TEMPLATES = {
       <h2>⚽ Welcome to Copa 26!</h2>
       <p>The World Cup 2026 starts <strong>tomorrow, June 11</strong> with Mexico vs South Africa!</p>
       <p>Make sure your predictions are in before kickoff — once a game starts, your pick locks. 🔒</p>
-      <div class="banner">🎯 Scoring: Winner <strong>+3</strong> · Each team's goals <strong>+3</strong> · Exact score <strong>+3</strong> · Max <strong>12/game</strong></div>
+      <div class="banner">🎯 Scoring: Exact score <strong>+5</strong> · Correct winner <strong>+3</strong> · One team right <strong>+1</strong> · Max <strong>5/game</strong></div>
       <p>Good luck to everyone — and remember: <em>no crying in quiniela.</em></p>
       ${buildStandingsHtml(lb)}
     `,
