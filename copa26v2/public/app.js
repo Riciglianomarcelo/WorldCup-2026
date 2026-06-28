@@ -665,25 +665,47 @@ let qCollapsed = {};
 function buildDateFilters(barId, currentFilter, setFn) {
   const bar = document.getElementById(barId); if (!bar) return;
   const todayStr = new Date().toISOString().slice(0, 10);
-  const dates = [...new Set(ALL_GAMES.filter(g => g.kickoff).map(g => g.kickoff.slice(0, 10)))].sort();
+  const allDates = [...new Set(ALL_GAMES.filter(g => g.kickoff).map(g => g.kickoff.slice(0, 10)))].sort();
+  const futureDates = allDates.filter(d => d >= todayStr);
+  const pastDates = allDates.filter(d => d < todayStr);
   const groups = [...new Set(ALL_GAMES.filter(g => g.group).map(g => g.group))].sort();
+
   let html = `<button class="ev-filter-btn ${currentFilter==='all'?'active':''}" onclick="${setFn}('all')">All</button>`;
   html += `<button class="ev-filter-btn q-today-btn ${currentFilter==='today'?'active':''}" onclick="${setFn}('today')">📅 Today</button>`;
-  html += `<span class="q-filter-sep">|</span>`;
-  dates.forEach(d => {
-    const dt = new Date(d + 'T12:00:00Z');
-    const label = dt.toLocaleDateString(undefined, { month: 'short', day: 'numeric' });
-    const isToday = d === todayStr;
-    html += `<button class="ev-filter-btn ${currentFilter===d?'active':''}" onclick="${setFn}('${d}')">${isToday ? '🟢 ' : ''}${label}</button>`;
-  });
-  html += `<span class="q-filter-sep">|</span>`;
-  groups.forEach(g => { html += `<button class="ev-filter-btn ${currentFilter==='grp-'+g?'active':''}" onclick="${setFn}('grp-${g}')">Grp ${g}</button>`; });
+
+  // KO round filters first (current phase)
   html += `<span class="q-filter-sep">|</span>`;
   html += `<button class="ev-filter-btn ${currentFilter==='ko'?'active':''}" onclick="${setFn}('ko')">KO</button>`;
   ['r32','r16','qf','sf','3rd','final'].forEach(p => {
     const labels = {r32:'R32',r16:'R16',qf:'QF',sf:'SF','3rd':'3P',final:'Final'};
     html += `<button class="ev-filter-btn ${currentFilter==='phase-'+p?'active':''}" onclick="${setFn}('phase-${p}')">${labels[p]}</button>`;
   });
+
+  // Today + future dates
+  if (futureDates.length) {
+    html += `<span class="q-filter-sep">|</span>`;
+    futureDates.forEach(d => {
+      const dt = new Date(d + 'T12:00:00Z');
+      const label = dt.toLocaleDateString(undefined, { month: 'short', day: 'numeric' });
+      const isToday = d === todayStr;
+      html += `<button class="ev-filter-btn ${currentFilter===d?'active':''}" onclick="${setFn}('${d}')">${isToday ? '🟢 ' : ''}${label}</button>`;
+    });
+  }
+
+  // Group filters
+  html += `<span class="q-filter-sep">|</span>`;
+  groups.forEach(g => { html += `<button class="ev-filter-btn ${currentFilter==='grp-'+g?'active':''}" onclick="${setFn}('grp-${g}')">Grp ${g}</button>`; });
+
+  // Past dates last
+  if (pastDates.length) {
+    html += `<span class="q-filter-sep">|</span>`;
+    pastDates.forEach(d => {
+      const dt = new Date(d + 'T12:00:00Z');
+      const label = dt.toLocaleDateString(undefined, { month: 'short', day: 'numeric' });
+      html += `<button class="ev-filter-btn ${currentFilter===d?'active':''}" onclick="${setFn}('${d}')">${label}</button>`;
+    });
+  }
+
   bar.innerHTML = html;
 }
 
@@ -1218,12 +1240,14 @@ function renderEvFilters() {
   const groups = [...new Set(evData.games.filter(g => g.phase === 'group').map(g => g.group))].sort();
   let html = `<button class="ev-filter-btn ${evFilter==='all'?'active':''}" onclick="setEvFilter('all')">All</button>`;
   html += `<button class="ev-filter-btn ${evFilter==='today'?'active':''}" onclick="setEvFilter('today')">Today</button>`;
-  groups.forEach(g => { html += `<button class="ev-filter-btn ${evFilter===g?'active':''}" onclick="setEvFilter('${g}')">Grp ${g}</button>`; });
+  // KO rounds first
   html += `<button class="ev-filter-btn ${evFilter==='ko'?'active':''}" onclick="setEvFilter('ko')">KO</button>`;
   ['r32','r16','qf','sf','3rd','final'].forEach(p => {
     const labels = {r32:'R32',r16:'R16',qf:'QF',sf:'SF','3rd':'3P',final:'Final'};
     html += `<button class="ev-filter-btn ${evFilter==='phase-'+p?'active':''}" onclick="setEvFilter('phase-${p}')">${labels[p]}</button>`;
   });
+  // Groups last
+  groups.forEach(g => { html += `<button class="ev-filter-btn ${evFilter===g?'active':''}" onclick="setEvFilter('${g}')">Grp ${g}</button>`; });
   el.innerHTML = html;
 }
 
