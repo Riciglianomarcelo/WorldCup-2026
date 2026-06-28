@@ -34,6 +34,8 @@ const db = {
   quiniela_results: Datastore.create({ filename: path.join(DATA_DIR, 'quiniela_results.db'), autoload: true }),
   knockout_teams:   Datastore.create({ filename: path.join(DATA_DIR, 'knockout_teams.db'),   autoload: true }),
   notifications:    Datastore.create({ filename: path.join(DATA_DIR, 'notifications.db'),    autoload: true }),
+  final_picks:      Datastore.create({ filename: path.join(DATA_DIR, 'final_picks.db'),      autoload: true }),
+  final_results:    Datastore.create({ filename: path.join(DATA_DIR, 'final_results.db'),    autoload: true }),
 };
 
 // ─── MIDDLEWARE ───────────────────────────────────────────────────────────────
@@ -329,14 +331,18 @@ function scoreGame(pick, result, phase) {
   const ph = String(pick.homeGoals).trim(), pa = String(pick.awayGoals).trim();
   const rh = String(result.homeGoals).trim(), ra = String(result.awayGoals).trim();
   if (ph === '' || pa === '' || rh === '' || ra === '') return 0;
+  let pts = 0;
   // Exact score → 5 pts
-  if (ph === rh && pa === ra) return 5;
+  if (ph === rh && pa === ra) pts = 5;
   // Correct outcome (winner/draw) → 3 pts
-  if (getOutcome(ph, pa) === getOutcome(rh, ra)) return 3;
+  else if (getOutcome(ph, pa) === getOutcome(rh, ra)) pts = 3;
   // One team's goals right but outcome wrong → 1 pt
-  if (ph === rh || pa === ra) return 1;
-  // Miss everything → 0
-  return 0;
+  else if (ph === rh || pa === ra) pts = 1;
+  // Penalty winner bonus: +1 if knockout game went to penalties and player predicted correct winner
+  if (phase !== 'group' && result.penaltyWinner && pick.penaltyWinner && result.penaltyWinner === pick.penaltyWinner) {
+    pts += 1;
+  }
+  return pts;
 }
 
 function getOutcome(home, away) {
@@ -472,7 +478,7 @@ app.get('/api/quiniela/picks/me', requireAuth, async (req, res) => {
 
 app.post('/api/quiniela/picks', requireAuth, async (req, res) => {
   try {
-    const { picks } = req.body; // { gameId: { homeGoals, awayGoals } }
+    const { picks } = req.body; // { gameId: { homeGoals, awayGoals, penaltyWinner? } }
     if (!picks || typeof picks !== 'object') return res.status(400).json({ error: 'No picks' });
 
     const existing = await db.quiniela_picks.findOne({ userId: req.user.userId });
@@ -486,7 +492,8 @@ app.post('/api/quiniela/picks', requireAuth, async (req, res) => {
         const prev = current[gameId];
         const changed = !prev
           || String(prev.homeGoals) !== String(pick.homeGoals)
-          || String(prev.awayGoals) !== String(pick.awayGoals);
+          || String(prev.awayGoals) !== String(pick.awayGoals)
+          || String(prev.penaltyWinner || '') !== String(pick.penaltyWinner || '');
         if (changed) rejected.push(gameId);
         continue; // never modify a locked game's stored value
       }
@@ -521,7 +528,9 @@ app.post('/api/quiniela/results', requireAdmin, async (req, res) => {
       const h = String(r.homeGoals ?? '').trim();
       const a = String(r.awayGoals ?? '').trim();
       if (h === '' || a === '') continue;                 // ignore blanks: never wipe a synced score
-      data[gameId] = { homeGoals: h, awayGoals: a, source: 'manual' };  // manual override the sync won't touch
+      const entry = { homeGoals: h, awayGoals: a, source: 'manual' };
+      if (r.penaltyWinner) entry.penaltyWinner = r.penaltyWinner;  // store penalty winner if provided
+      data[gameId] = entry;
       set++;
     }
     const who = req.user?.userName || 'admin';
@@ -670,16 +679,21 @@ app.get('/api/leaderboard', async (req, res) => {
     const quinielaPicksAll = await db.quiniela_picks.find({});
     const awardsResults = await db.awards_results.findOne({ _id: 'official' });
     const quinielaResults = await db.quiniela_results.findOne({ _id: 'official' });
+    const finalPicksAll = await db.final_picks.find({});
+    const finalResultDoc = await db.final_results.findOne({ _id: 'official' });
     const qResults = quinielaResults?.data || {};
     const aResults = awardsResults?.data || null;
+    const finalResult = finalResultDoc?.result || null;
 
     const awardsMap = {};
     awardsPicksAll.forEach(p => awardsMap[p.userId] = p);
     const quinielaMap = {};
     quinielaPicksAll.forEach(p => quinielaMap[p.userId] = p);
+    const finalMap = {};
+    finalPicksAll.forEach(p => finalMap[p.userId] = p);
 
     const leaderboard = users.map(u => {
-      let awardsScore = 0, quinielaScore = 0;
+      let awardsScore = 0, quinielaScore = 0, finalScore = 0;
       let gamesCorrect = 0, gamesExact = 0, gamesPicked = 0;
 
       // Awards score
@@ -700,10 +714,16 @@ app.get('/api/leaderboard', async (req, res) => {
           if (pick && result) {
             const pts = scoreGame(pick, result, game.phase);
             quinielaScore += pts;
-            if (pts === 5) gamesExact++;
+            if (pts >= 5) gamesExact++;
             if (pts >= 3) gamesCorrect++;
           }
         }
+      }
+
+      // Final prediction score
+      const fp = finalMap[u._id];
+      if (fp && finalResult) {
+        finalScore = scoreFinalPrediction(fp.pick, finalResult);
       }
 
       return {
@@ -713,7 +733,8 @@ app.get('/api/leaderboard', async (req, res) => {
         joinedAt: u.joinedAt,
         awardsScore,
         quinielaScore,
-        totalScore: awardsScore + quinielaScore,
+        finalScore,
+        totalScore: awardsScore + quinielaScore + finalScore,
         gamesCorrect,
         gamesExact,
         gamesPicked,
@@ -955,6 +976,62 @@ app.post('/api/admin/knockout-teams', requireAdmin, async (req, res) => {
     res.json({ success: true });
   } catch(e) { res.status(500).json({ error: e.message }); }
 });
+
+// ─── FINAL PREDICTION (pick finalists + winner) ──────────────────────────────
+app.get('/api/final-picks/me', requireAuth, async (req, res) => {
+  const p = await db.final_picks.findOne({ userId: req.user.userId });
+  res.json({ pick: p?.pick || null });
+});
+
+app.post('/api/final-picks', requireAuth, async (req, res) => {
+  try {
+    const { pick } = req.body; // { finalist1, finalist2, winner }
+    if (!pick) return res.status(400).json({ error: 'No pick data' });
+    const existing = await db.final_picks.findOne({ userId: req.user.userId });
+    if (existing) {
+      await db.final_picks.update({ userId: req.user.userId }, { $set: { pick, updatedAt: new Date().toISOString() } });
+    } else {
+      await db.final_picks.insert({ userId: req.user.userId, userName: req.user.userName, pick, submittedAt: new Date().toISOString() });
+    }
+    res.json({ success: true });
+  } catch(e) { res.status(500).json({ error: e.message }); }
+});
+
+app.get('/api/final-results', async (req, res) => {
+  const r = await db.final_results.findOne({ _id: 'official' });
+  res.json({ result: r?.result || null });
+});
+
+app.post('/api/final-results', requireAdmin, async (req, res) => {
+  try {
+    const { result } = req.body; // { finalist1, finalist2, winner }
+    if (!result) return res.status(400).json({ error: 'No result data' });
+    const existing = await db.final_results.findOne({ _id: 'official' });
+    if (existing) {
+      await db.final_results.update({ _id: 'official' }, { $set: { result, updatedAt: new Date().toISOString() } });
+    } else {
+      await db.final_results.insert({ _id: 'official', result, setAt: new Date().toISOString() });
+    }
+    res.json({ success: true });
+  } catch(e) { res.status(500).json({ error: e.message }); }
+});
+
+function scoreFinalPrediction(pick, result) {
+  if (!pick || !result) return 0;
+  let pts = 0;
+  const finalists = [result.finalist1?.toLowerCase().trim(), result.finalist2?.toLowerCase().trim()].filter(Boolean);
+  const pFinalists = [pick.finalist1?.toLowerCase().trim(), pick.finalist2?.toLowerCase().trim()].filter(Boolean);
+  // 5 pts per correct finalist (order doesn't matter)
+  const matchedFinalists = new Set();
+  for (const pf of pFinalists) {
+    for (const rf of finalists) {
+      if (pf === rf && !matchedFinalists.has(rf)) { pts += 5; matchedFinalists.add(rf); break; }
+    }
+  }
+  // 10 pts for correct winner
+  if (pick.winner && result.winner && pick.winner.toLowerCase().trim() === result.winner.toLowerCase().trim()) pts += 10;
+  return pts;
+}
 
 // ─── HELPERS ─────────────────────────────────────────────────────────────────
 function getAvatar(name) {
