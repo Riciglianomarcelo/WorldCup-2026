@@ -892,6 +892,8 @@ document.getElementById('save-quiniela-btn2').addEventListener('click', saveQuin
 // ── FINAL PREDICTION ─────────────────────────────────────────────────────────
 let myFinalPick = null;
 let finalResult = null;
+let finalPickLocked = false;
+let finalPickDeadline = null;
 
 async function loadFinalPrediction() {
   try {
@@ -902,6 +904,8 @@ async function loadFinalPrediction() {
     const pd = await pickRes.json();
     const rd = await resRes.json();
     myFinalPick = pd.pick || null;
+    finalPickLocked = pd.locked || false;
+    finalPickDeadline = pd.deadline || null;
     finalResult = rd.result || null;
     renderFinalPrediction();
   } catch(e) {}
@@ -913,8 +917,19 @@ function renderFinalPrediction() {
     document.getElementById('fp-finalist2').value = myFinalPick.finalist2 || '';
     document.getElementById('fp-winner').value = myFinalPick.winner || '';
   }
-  // Show scoring if results are in
+  // Lock inputs if deadline passed
+  if (finalPickLocked) {
+    document.querySelectorAll('.final-pick-input').forEach(inp => { inp.disabled = true; });
+  }
+  // Show deadline info
   const resDiv = document.getElementById('final-pick-result');
+  let html = '';
+  if (finalPickLocked && !finalResult) {
+    html += `<div class="final-result-badge">🔒 Predicciones cerradas — la Ronda de 16 ya comenzó</div>`;
+  } else if (!finalPickLocked && finalPickDeadline) {
+    const dl = new Date(finalPickDeadline);
+    html += `<div class="final-result-badge">⏰ Fecha límite: ${dl.toLocaleDateString(undefined, { weekday:'short', month:'short', day:'numeric' })} ${dl.toLocaleTimeString(undefined, { hour:'2-digit', minute:'2-digit' })} (inicio R16)</div>`;
+  }
   if (finalResult && myFinalPick) {
     const finalists = [finalResult.finalist1?.toLowerCase().trim(), finalResult.finalist2?.toLowerCase().trim()].filter(Boolean);
     const pFinalists = [myFinalPick.finalist1?.toLowerCase().trim(), myFinalPick.finalist2?.toLowerCase().trim()].filter(Boolean);
@@ -925,13 +940,13 @@ function renderFinalPrediction() {
     }
     const winnerCorrect = myFinalPick.winner && finalResult.winner && myFinalPick.winner.toLowerCase().trim() === finalResult.winner.toLowerCase().trim();
     if (winnerCorrect) pts += 10;
-    resDiv.innerHTML = `<div class="final-result-badge">Actual: <b>${esc(finalResult.finalist1)} vs ${esc(finalResult.finalist2)}</b> · Winner: <b>${esc(finalResult.winner)}</b> · <span class="q-pts-${pts > 0 ? '5' : '0'}">+${pts} pts</span></div>`;
-  } else {
-    resDiv.innerHTML = '';
+    html += `<div class="final-result-badge">Actual: <b>${esc(finalResult.finalist1)} vs ${esc(finalResult.finalist2)}</b> · Winner: <b>${esc(finalResult.winner)}</b> · <span class="q-pts-${pts > 0 ? '5' : '0'}">+${pts} pts</span></div>`;
   }
+  resDiv.innerHTML = html;
 }
 
 async function saveFinalPrediction() {
+  if (finalPickLocked) { showToast('🔒 Final prediction locked — R16 has started'); return; }
   const pick = {
     finalist1: document.getElementById('fp-finalist1').value.trim(),
     finalist2: document.getElementById('fp-finalist2').value.trim(),
