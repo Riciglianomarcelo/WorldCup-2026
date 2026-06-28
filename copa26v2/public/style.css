@@ -1380,3 +1380,96 @@ button, [role="button"], .tab-btn, .btn-green, .btn-ghost, .lang-btn,
   .final-pick-grid { grid-template-columns: 1fr; }
   .q-penalty-row { flex-wrap: wrap; }
 }
+
+/* ═══ BRACKET VIEW ═══ */
+.bracket-scroll { overflow-x: auto; padding-bottom: 16px; }
+.bk-half { margin-bottom: 24px; }
+.bk-half-label {
+  font-size: 13px; font-weight: 700; text-transform: uppercase;
+  color: var(--text-2); letter-spacing: 1px; margin-bottom: 8px;
+  padding: 4px 12px; background: var(--surface); border-radius: 6px;
+  display: inline-block;
+}
+.bk-columns {
+  display: flex; gap: 6px; min-width: 700px;
+  align-items: stretch;
+}
+.bk-round {
+  display: flex; flex-direction: column; justify-content: space-around;
+  flex: 1; min-width: 140px; gap: 4px;
+}
+.bk-round-header {
+  text-align: center; font-size: 11px; font-weight: 700;
+  color: var(--text-3); text-transform: uppercase; letter-spacing: 1px;
+  padding: 4px 0; margin-bottom: 2px;
+}
+.bk-game {
+  background: var(--surface); border: 1.5px solid var(--border);
+  border-radius: 8px; overflow: hidden; flex-shrink: 0;
+  position: relative;
+}
+.bk-game .bk-round-tag {
+  display: none; /* header already shows round */
+}
+.bk-team {
+  display: flex; justify-content: space-between; align-items: center;
+  padding: 6px 10px; font-size: 12px; font-weight: 500;
+  color: var(--text); border-bottom: 1px solid var(--border);
+  min-height: 28px;
+}
+.bk-team:last-child { border-bottom: none; }
+.bk-name { flex: 1; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.bk-score {
+  font-weight: 700; font-size: 13px; min-width: 20px; text-align: center;
+  margin-left: 6px; color: var(--gold, #C9A84C);
+}
+.bk-winner {
+  background: rgba(var(--green-rgb, 76,175,80), 0.12);
+  font-weight: 700;
+}
+.bk-winner .bk-name { color: var(--green); }
+.bk-loser { opacity: 0.5; }
+
+/* Connector lines between rounds */
+.bk-r32 .bk-game { margin: 1px 0; }
+.bk-r16 .bk-game { margin: 4px 0; }
+.bk-qf .bk-game { margin: 12px 0; }
+.bk-sf .bk-game { margin: 24px 0; }
+
+.bk-round { position: relative; }
+.bk-round::before {
+  content: ''; position: absolute; left: -4px; top: 0; bottom: 0;
+  width: 3px; border-left: 2px solid var(--border);
+  border-radius: 2px;
+}
+.bk-r32::before { display: none; }
+
+/* Final row */
+.bk-final-row {
+  display: flex; gap: 16px; justify-content: center;
+  flex-wrap: wrap; margin-top: 16px;
+}
+.bk-final-card {
+  min-width: 200px; max-width: 300px; flex: 1;
+}
+.bk-final-card .bk-game {
+  border-color: var(--gold, #C9A84C); border-width: 2px;
+}
+.bk-3rd .bk-game { border-color: var(--border); border-width: 1.5px; }
+.bk-legend {
+  margin-top: 16px; padding: 12px; font-size: 12px;
+  color: var(--text-3); line-height: 1.5;
+}
+.bk-legend p { margin: 0 0 4px; }
+
+@media (max-width: 600px) {
+  .bk-columns { min-width: 580px; gap: 4px; }
+  .bk-round { min-width: 110px; }
+  .bk-team { padding: 4px 6px; font-size: 11px; }
+}
+
+/* Bracket path info in knockout editor */
+.ko-path-info {
+  font-size: 11px; color: var(--green); font-weight: 600;
+  opacity: 0.7; margin-left: 4px;
+}
