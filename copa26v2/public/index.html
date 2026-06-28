@@ -177,13 +177,33 @@
       <h2 data-i18n="tab_quiniela">⚽ Quiniela</h2>
       <button id="save-quiniela-btn" class="btn-green" data-i18n="save_quiniela">⚽ Save Picks</button>
     </div>
-    <p class="tab-desc" data-i18n="quiniela_desc">Predict the score for every game. Exact score +5pts, correct winner/draw +3pts, one team's goals right +1pt. Max 5 per game.</p>
+    <p class="tab-desc" data-i18n="quiniela_desc">Predict the score for every game. Exact score +5pts, correct winner/draw +3pts, one team's goals right +1pt. Knockout ties: +1 bonus for correct penalty winner.</p>
     <div id="quiniela-progress" class="progress-bar-wrap">
       <div id="quiniela-progress-fill" class="progress-bar-fill" style="width:0%"></div>
       <span id="quiniela-progress-label" class="progress-label">0 / 104</span>
     </div>
     <div class="q-filter-bar" id="q-filter-bar"></div>
     <div id="quiniela-grid" class="quiniela-grid"></div>
+
+    <div class="final-prediction-section">
+      <h3>🏆 Final Prediction</h3>
+      <p class="tab-desc">Pick the two finalists and the winner. 5 pts per correct finalist, 10 pts for the winner.</p>
+      <div class="final-pick-grid">
+        <div class="final-pick-item">
+          <label>Finalist 1</label>
+          <input type="text" id="fp-finalist1" class="final-pick-input" placeholder="e.g. Brazil" />
+        </div>
+        <div class="final-pick-item">
+          <label>Finalist 2</label>
+          <input type="text" id="fp-finalist2" class="final-pick-input" placeholder="e.g. Argentina" />
+        </div>
+        <div class="final-pick-item final-pick-winner">
+          <label>🏆 Winner</label>
+          <input type="text" id="fp-winner" class="final-pick-input" placeholder="e.g. Brazil" />
+        </div>
+      </div>
+      <div id="final-pick-result" class="final-pick-result"></div>
+    </div>
     <div class="sticky-footer">
       <button id="save-quiniela-btn2" class="btn-green btn-lg" data-i18n="save_quiniela">⚽ Save All Picks</button>
       <p class="footer-note" data-i18n="quiniela_note">Save often — your picks auto-update</p>
@@ -217,6 +237,7 @@
     <div class="results-tabs">
       <button class="res-tab-btn active" data-rtab="awards-results" data-i18n="awards_results">⭐ Award Results</button>
       <button class="res-tab-btn" data-rtab="quiniela-results" data-i18n="quiniela_results">⚽ Game Results</button>
+      <button class="res-tab-btn" data-rtab="final-results">🏆 Final Result</button>
     </div>
 
     <div id="awards-results-panel" class="res-panel">
@@ -233,6 +254,27 @@
       <div id="quiniela-results-grid" class="quiniela-grid"></div>
       <div class="sticky-footer">
         <button id="save-quiniela-results-btn" class="btn-green btn-lg" data-i18n="save_quiniela_results">💾 Save Game Results</button>
+      </div>
+    </div>
+
+    <div id="final-results-panel" class="res-panel hidden">
+      <p class="tab-desc">Enter the actual finalists and winner once the Final is played.</p>
+      <div class="final-pick-grid">
+        <div class="final-pick-item">
+          <label>Finalist 1</label>
+          <input type="text" id="fr-finalist1" class="final-pick-input" placeholder="e.g. Brazil" />
+        </div>
+        <div class="final-pick-item">
+          <label>Finalist 2</label>
+          <input type="text" id="fr-finalist2" class="final-pick-input" placeholder="e.g. Argentina" />
+        </div>
+        <div class="final-pick-item final-pick-winner">
+          <label>🏆 Winner</label>
+          <input type="text" id="fr-winner" class="final-pick-input" placeholder="e.g. Brazil" />
+        </div>
+      </div>
+      <div class="sticky-footer">
+        <button id="save-final-results-btn" class="btn-green btn-lg">🏆 Save Final Result</button>
       </div>
     </div>
   </div>
