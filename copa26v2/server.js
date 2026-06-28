@@ -236,9 +236,54 @@ const GROUP_FIXTURES = {
 };
 // Is this game locked (kickoff has passed)? Group games use GROUP_FIXTURES;
 // games with no known kickoff (knockouts, until mapped) are never locked yet.
+// ─── KNOCKOUT KICKOFFS (UTC) ────────────────────────────────────────────────
+// Source: FIFA / Yahoo Sports / Sky Sports — all verified cross-ref ET↔BST
+const KNOCKOUT_FIXTURES = {
+  // R32 (June 28 – July 3)
+  'R32_01': '2026-06-28T19:00:00Z', // M73 RSA-CAN 3pm ET
+  'R32_02': '2026-06-29T20:30:00Z', // M74 GER-PAR 4:30pm ET
+  'R32_03': '2026-06-30T01:00:00Z', // M75 NED-MAR 9pm ET Jun29
+  'R32_04': '2026-06-29T17:00:00Z', // M76 BRA-JPN 1pm ET
+  'R32_05': '2026-06-30T21:00:00Z', // M77 FRA-SWE 5pm ET
+  'R32_06': '2026-06-30T17:00:00Z', // M78 CIV-NOR 1pm ET
+  'R32_07': '2026-07-01T01:00:00Z', // M79 MEX-ECU 9pm ET Jun30
+  'R32_08': '2026-07-01T16:00:00Z', // M80 ENG-COD 12pm ET
+  'R32_09': '2026-07-02T00:00:00Z', // M81 USA-BIH 8pm ET Jul1
+  'R32_10': '2026-07-01T20:00:00Z', // M82 BEL-SEN 4pm ET
+  'R32_11': '2026-07-02T23:00:00Z', // M83 POR-CRO 7pm ET
+  'R32_12': '2026-07-02T19:00:00Z', // M84 ESP-AUT 3pm ET
+  'R32_13': '2026-07-03T03:00:00Z', // M85 SUI-ALG 11pm ET Jul2
+  'R32_14': '2026-07-03T22:00:00Z', // M86 ARG-CPV 6pm ET
+  'R32_15': '2026-07-04T01:30:00Z', // M87 COL-GHA 9:30pm ET Jul3
+  'R32_16': '2026-07-03T18:00:00Z', // M88 AUS-EGY 2pm ET
+  // R16 (July 4–7)
+  'R16_01': '2026-07-04T21:00:00Z', // M89 5pm ET
+  'R16_02': '2026-07-04T17:00:00Z', // M90 1pm ET
+  'R16_03': '2026-07-05T20:00:00Z', // M91 4pm ET
+  'R16_04': '2026-07-06T00:00:00Z', // M92 8pm ET Jul5
+  'R16_05': '2026-07-06T19:00:00Z', // M93 3pm ET
+  'R16_06': '2026-07-07T00:00:00Z', // M94 8pm ET Jul6
+  'R16_07': '2026-07-07T16:00:00Z', // M95 12pm ET
+  'R16_08': '2026-07-07T20:00:00Z', // M96 4pm ET
+  // QF (July 9–11)
+  'QF_1': '2026-07-09T20:00:00Z',   // M97 4pm ET
+  'QF_2': '2026-07-10T19:00:00Z',   // M98 3pm ET (note: QF2 not QF3)
+  'QF_3': '2026-07-11T21:00:00Z',   // M99 5pm ET
+  'QF_4': '2026-07-12T01:00:00Z',   // M100 9pm ET Jul11
+  // SF (July 14–15)
+  'SF_1': '2026-07-14T19:00:00Z',   // M101 3pm ET
+  'SF_2': '2026-07-15T19:00:00Z',   // M102 3pm ET
+  // 3rd + Final
+  '3RD':  '2026-07-18T21:00:00Z',   // M103 5pm ET
+  'FINAL':'2026-07-19T19:00:00Z',   // M104 3pm ET
+};
+
 function gameKickoff(gameId) {
-  const f = GROUP_FIXTURES[gameId];
-  return f && f.kickoff ? Date.parse(f.kickoff) : null;
+  const gf = GROUP_FIXTURES[gameId];
+  if (gf && gf.kickoff) return Date.parse(gf.kickoff);
+  const kf = KNOCKOUT_FIXTURES[gameId];
+  if (kf) return Date.parse(kf);
+  return null;
 }
 function isLocked(gameId) {
   const ko = gameKickoff(gameId);
@@ -432,7 +477,7 @@ app.get('/api/schedule', async (req, res) => {
 
     // Merge overrides into knockout games, and attach kickoff + lock state to all
     const games = ALL_GAMES.map(g => {
-      const kickoff = GROUP_FIXTURES[g.id]?.kickoff || null;
+      const kickoff = GROUP_FIXTURES[g.id]?.kickoff || KNOCKOUT_FIXTURES[g.id] || null;
       const locked = isLocked(g.id);
       if (g.phase === 'group') return { ...g, kickoff, locked };
       const override = teamOverrides[g.id];
@@ -578,17 +623,17 @@ app.get('/api/picks/transparency', requireAuth, async (req, res) => {
     const players = users.map(u => ({ id: u._id, name: u.name, avatar: u.avatar }));
 
     const games = ALL_GAMES.map(g => {
-      const kickoff = GROUP_FIXTURES[g.id]?.kickoff || null;
+      const kickoff = GROUP_FIXTURES[g.id]?.kickoff || KNOCKOUT_FIXTURES[g.id] || null;
       const locked  = isLocked(g.id);
       const r       = results[g.id];
-      const result  = r ? { homeGoals: r.homeGoals, awayGoals: r.awayGoals } : null;
+      const result  = r ? { homeGoals: r.homeGoals, awayGoals: r.awayGoals, penaltyWinner: r.penaltyWinner || null } : null;
       const base    = { id: g.id, home: g.home, away: g.away, group: g.group, phase: g.phase, kickoff, locked, result };
 
       if (locked) {
         const playerPicks = {};
         players.forEach(p => {
           const pick = picksMap[p.id]?.[g.id];
-          playerPicks[p.id] = isFilled(pick) ? { homeGoals: pick.homeGoals, awayGoals: pick.awayGoals } : null;
+          playerPicks[p.id] = isFilled(pick) ? { homeGoals: pick.homeGoals, awayGoals: pick.awayGoals, penaltyWinner: pick.penaltyWinner || null } : null;
         });
         return { ...base, playerPicks };
       } else {
@@ -627,11 +672,13 @@ app.get('/api/leaderboard/race', async (req, res) => {
 
     const scored = [];
     for (const [gameId, result] of Object.entries(results)) {
-      const kof = GROUP_FIXTURES[gameId]?.kickoff;
+      const kof = GROUP_FIXTURES[gameId]?.kickoff || KNOCKOUT_FIXTURES[gameId] || null;
       if (!kof) continue;
+      const kickStr = typeof kof === 'string' ? kof : '';
       const oh = parseInt(result.homeGoals), oa = parseInt(result.awayGoals);
       if (isNaN(oh) || isNaN(oa)) continue;
-      scored.push({ gameId, day: kof.slice(0, 10), homeGoals: oh, awayGoals: oa,
+      scored.push({ gameId, day: kickStr.slice(0, 10), homeGoals: oh, awayGoals: oa,
+                    penaltyWinner: result.penaltyWinner || null,
                     phase: gamePhaseMap[gameId] || 'group' });
     }
     scored.sort((a,b) => a.day.localeCompare(b.day));
@@ -695,6 +742,8 @@ app.get('/api/leaderboard', async (req, res) => {
     const leaderboard = users.map(u => {
       let awardsScore = 0, quinielaScore = 0, finalScore = 0;
       let gamesCorrect = 0, gamesExact = 0, gamesPicked = 0;
+      let todayPts = 0;
+      const todayStr = new Date().toISOString().slice(0, 10);
 
       // Awards score
       const ap = awardsMap[u._id];
@@ -716,6 +765,11 @@ app.get('/api/leaderboard', async (req, res) => {
             quinielaScore += pts;
             if (pts >= 5) gamesExact++;
             if (pts >= 3) gamesCorrect++;
+            // Check if this game was today
+            const ko = GROUP_FIXTURES[game.id]?.kickoff || KNOCKOUT_FIXTURES[game.id] || null;
+            if (ko && (typeof ko === 'string' ? ko : '').slice(0, 10) === todayStr) {
+              todayPts += pts;
+            }
           }
         }
       }
@@ -735,6 +789,7 @@ app.get('/api/leaderboard', async (req, res) => {
         quinielaScore,
         finalScore,
         totalScore: awardsScore + quinielaScore + finalScore,
+        todayPts,
         gamesCorrect,
         gamesExact,
         gamesPicked,
