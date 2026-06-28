@@ -114,6 +114,7 @@
       <button class="tab-btn active" data-tab="leaderboard" data-i18n="tab_leaderboard"><span class="tab-icon">🏆</span><span class="tab-label">Board</span><span class="tab-label-full">Leaderboard</span></button>
       <button class="tab-btn" data-tab="race"><span class="tab-icon">📈</span><span class="tab-label">Race</span><span class="tab-label-full">Race</span></button>
       <button class="tab-btn" data-tab="groups"><span class="tab-icon">🌍</span><span class="tab-label">Groups</span><span class="tab-label-full">Groups</span></button>
+      <button class="tab-btn" data-tab="bracket"><span class="tab-icon">🏟️</span><span class="tab-label">Bracket</span><span class="tab-label-full">Bracket</span></button>
       <button class="tab-btn" data-tab="awards" data-i18n="tab_awards"><span class="tab-icon">⭐</span><span class="tab-label">Awards</span><span class="tab-label-full">Awards</span></button>
       <button class="tab-btn" data-tab="quiniela" data-i18n="tab_quiniela"><span class="tab-icon">⚽</span><span class="tab-label">Quiniela</span><span class="tab-label-full">Quiniela</span></button>
       <button class="tab-btn" data-tab="everyone"><span class="tab-icon">👀</span><span class="tab-label">All</span><span class="tab-label-full">Everyone</span></button>
@@ -156,6 +157,15 @@
       <button onclick="loadGroups()" class="btn-ghost">↻ Refresh</button>
     </div>
     <div id="groups-content"></div>
+  </div>
+
+  <div id="tab-bracket" class="tab hidden">
+    <div class="tab-header">
+      <h2>🏟️ Bracket</h2>
+      <button onclick="loadBracket()" class="btn-ghost">↻ Refresh</button>
+    </div>
+    <p class="tab-desc">The full knockout bracket. Winners flow right → toward the Final.</p>
+    <div id="bracket-content" class="bracket-scroll"></div>
   </div>
 
   <div id="tab-awards" class="tab hidden">
