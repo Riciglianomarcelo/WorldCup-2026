@@ -978,13 +978,19 @@ app.post('/api/admin/knockout-teams', requireAdmin, async (req, res) => {
 });
 
 // ─── FINAL PREDICTION (pick finalists + winner) ──────────────────────────────
+// Locks when R16 starts: July 4, 2026 at 1pm ET = 17:00 UTC
+const FINAL_PICK_DEADLINE = new Date('2026-07-04T17:00:00Z');
+
 app.get('/api/final-picks/me', requireAuth, async (req, res) => {
   const p = await db.final_picks.findOne({ userId: req.user.userId });
-  res.json({ pick: p?.pick || null });
+  res.json({ pick: p?.pick || null, locked: Date.now() >= FINAL_PICK_DEADLINE.getTime(), deadline: FINAL_PICK_DEADLINE.toISOString() });
 });
 
 app.post('/api/final-picks', requireAuth, async (req, res) => {
   try {
+    if (Date.now() >= FINAL_PICK_DEADLINE.getTime()) {
+      return res.status(403).json({ error: 'Final prediction locked — R16 has started' });
+    }
     const { pick } = req.body; // { finalist1, finalist2, winner }
     if (!pick) return res.status(400).json({ error: 'No pick data' });
     const existing = await db.final_picks.findOne({ userId: req.user.userId });
