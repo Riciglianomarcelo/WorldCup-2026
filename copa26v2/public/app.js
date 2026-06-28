@@ -287,6 +287,7 @@ function enterApp() {
   loadLeaderboard();
   loadMyAwardsPicks();
   loadMyQuinielaPicks();
+  loadFinalPrediction();
 }
 
 // ── LOGOUT ────────────────────────────────────────────────────────────────────
@@ -318,9 +319,9 @@ document.getElementById('nav-tabs').addEventListener('click', e => {
   if (tab === 'groups') loadGroups();
   if (tab === 'admin') loadAdmin();
   if (tab === 'everyone') loadEveryone();
-  if (tab === 'results') { loadAwardsResultsPanel(); loadQuinielaResultsPanel(); }
+  if (tab === 'results') { loadAwardsResultsPanel(); loadQuinielaResultsPanel(); loadFinalResultsPanel(); }
   if (tab !== 'race' && racePlaying) { clearInterval(raceTimer); racePlaying = false; }
-  if (tab === 'quiniela') { buildDateFilters('q-filter-bar', qFilter, 'setQFilter'); renderQuinielaGrid(); }
+  if (tab === 'quiniela') { buildDateFilters('q-filter-bar', qFilter, 'setQFilter'); renderQuinielaGrid(); renderFinalPrediction(); }
   if (tab === 'awards') renderAwardsGrid();
 });
 
@@ -547,7 +548,7 @@ function renderLeaderboard(data) {
       </div>
       <div class="lb-score-wrap">
         <div class="lb-total">${p.totalScore || '—'}</div>
-        <div class="lb-breakdown">${p.awardsScore} ${t('awards_pts')} + ${p.quinielaScore} ${t('quiniela_pts')}</div>
+        <div class="lb-breakdown">${p.awardsScore} ${t('awards_pts')} + ${p.quinielaScore} ${t('quiniela_pts')}${p.finalScore ? ' + ' + p.finalScore + ' Final' : ''}</div>
       </div>
     </div>`;
   });
@@ -677,7 +678,12 @@ function buildDateFilters(barId, currentFilter, setFn) {
   });
   html += `<span class="q-filter-sep">|</span>`;
   groups.forEach(g => { html += `<button class="ev-filter-btn ${currentFilter==='grp-'+g?'active':''}" onclick="${setFn}('grp-${g}')">Grp ${g}</button>`; });
+  html += `<span class="q-filter-sep">|</span>`;
   html += `<button class="ev-filter-btn ${currentFilter==='ko'?'active':''}" onclick="${setFn}('ko')">KO</button>`;
+  ['r32','r16','qf','sf','3rd','final'].forEach(p => {
+    const labels = {r32:'R32',r16:'R16',qf:'QF',sf:'SF','3rd':'3P',final:'Final'};
+    html += `<button class="ev-filter-btn ${currentFilter==='phase-'+p?'active':''}" onclick="${setFn}('phase-${p}')">${labels[p]}</button>`;
+  });
   bar.innerHTML = html;
 }
 
@@ -686,6 +692,7 @@ function filterGamesByQ(filter) {
   if (filter === 'all') return ALL_GAMES;
   if (filter === 'today') return ALL_GAMES.filter(g => g.kickoff && g.kickoff.slice(0, 10) === todayStr);
   if (filter === 'ko') return ALL_GAMES.filter(g => g.phase !== 'group');
+  if (filter.startsWith('phase-')) return ALL_GAMES.filter(g => g.phase === filter.slice(6));
   if (filter.startsWith('grp-')) return ALL_GAMES.filter(g => g.group === filter.slice(4));
   return ALL_GAMES.filter(g => g.kickoff && g.kickoff.slice(0, 10) === filter);
 }
@@ -754,8 +761,13 @@ function renderQuinielaGrid() {
       const kickTime = game.kickoff ? new Date(game.kickoff).toLocaleTimeString(undefined, { hour: '2-digit', minute: '2-digit' }) : '';
       const groupLabel = game.phase === 'group' ? `Grp ${game.group}` : game.id;
 
+      const isKnockout = game.phase !== 'group';
+      const pickH = String(pick.homeGoals ?? '').trim();
+      const pickA = String(pick.awayGoals ?? '').trim();
+      const isDraw = isKnockout && pickH !== '' && pickA !== '' && pickH === pickA;
+
       const div = document.createElement('div');
-      div.className = 'q-game' + (pick.homeGoals!==undefined?' has-pick':'') + (pts===5?' exact-match':pts>=3?' correct-winner':pts===1?' partial-match':'') + (game.locked?' q-locked':'');
+      div.className = 'q-game' + (pick.homeGoals!==undefined?' has-pick':'') + (pts>=5?' exact-match':pts>=3?' correct-winner':pts===1?' partial-match':'') + (game.locked?' q-locked':'');
       div.innerHTML = `
         <div class="q-game-meta"><span class="q-grp-tag">${groupLabel}</span>${kickTime ? `<span class="q-kick-time">${kickTime}</span>` : ''}${game.locked ? '<span class="q-lock-icon">🔒</span>' : ''}</div>
         <div class="q-game-row">
@@ -768,10 +780,17 @@ function renderQuinielaGrid() {
             <input class="q-score-input" type="number" min="0" max="20"
               id="q-a-${game.id}" value="${pick.awayGoals??''}" placeholder="${t('away_placeholder')}"
               data-game="${game.id}" data-side="a"/>
-            ${result ? `<span class="q-result-badge ${pts===5?'q-pts-5':pts===3?'q-pts-3':pts===1?'q-pts-1':'q-pts-0'}">${result.homeGoals}–${result.awayGoals} ${pts!==null?'(+'+pts+')':''}</span>` : ''}
+            ${result ? `<span class="q-result-badge ${pts>=5?'q-pts-5':pts>=3?'q-pts-3':pts===1?'q-pts-1':'q-pts-0'}">${result.homeGoals}–${result.awayGoals}${result.penaltyWinner ? ' (P)' : ''} ${pts!==null?'(+'+pts+')':''}</span>` : ''}
           </div>
           <div class="q-team away">${esc(game.away)}</div>
         </div>
+        ${isKnockout ? `<div class="q-penalty-row ${isDraw ? '' : 'hidden'}" id="pen-row-${game.id}">
+          <span class="q-pen-label">⚽ Penalties — who wins?</span>
+          <div class="q-pen-btns">
+            <button type="button" class="q-pen-btn ${pick.penaltyWinner==='home'?'active':''}" data-game="${game.id}" data-pw="home">${esc(game.home)}</button>
+            <button type="button" class="q-pen-btn ${pick.penaltyWinner==='away'?'active':''}" data-game="${game.id}" data-pw="away">${esc(game.away)}</button>
+          </div>
+        </div>` : ''}
         ${!result && tip ? `<div class="q-tip">${tip}</div>` : ''}
       `;
       body.appendChild(div);
@@ -786,7 +805,27 @@ function renderQuinielaGrid() {
       if (!myQuinielaPicks[gameId]) myQuinielaPicks[gameId] = {};
       if (side==='h') myQuinielaPicks[gameId].homeGoals = inp.value;
       else myQuinielaPicks[gameId].awayGoals = inp.value;
+      // Toggle penalty row for knockout draws
+      const game = ALL_GAMES.find(g => g.id === gameId);
+      if (game && game.phase !== 'group') {
+        const penRow = document.getElementById('pen-row-' + gameId);
+        if (penRow) {
+          const h = String(myQuinielaPicks[gameId].homeGoals ?? '').trim();
+          const a = String(myQuinielaPicks[gameId].awayGoals ?? '').trim();
+          penRow.classList.toggle('hidden', !(h !== '' && a !== '' && h === a));
+          if (h !== a) { myQuinielaPicks[gameId].penaltyWinner = undefined; penRow.querySelectorAll('.q-pen-btn').forEach(b => b.classList.remove('active')); }
+        }
+      }
       updateProgress();
+    });
+  });
+  grid.querySelectorAll('.q-pen-btn').forEach(btn => {
+    btn.addEventListener('click', () => {
+      const gameId = btn.dataset.game, pw = btn.dataset.pw;
+      if (!myQuinielaPicks[gameId]) myQuinielaPicks[gameId] = {};
+      myQuinielaPicks[gameId].penaltyWinner = pw;
+      const row = document.getElementById('pen-row-' + gameId);
+      if (row) row.querySelectorAll('.q-pen-btn').forEach(b => b.classList.toggle('active', b.dataset.pw === pw));
     });
   });
 }
@@ -816,12 +855,106 @@ async function saveQuinielaPicks() {
   try {
     const res = await authFetch('/api/quiniela/picks', { method:'POST', body: JSON.stringify({ picks: myQuinielaPicks }) });
     const data = await res.json();
+    // Also save final prediction if filled
+    const f1 = document.getElementById('fp-finalist1')?.value?.trim();
+    const f2 = document.getElementById('fp-finalist2')?.value?.trim();
+    const fw = document.getElementById('fp-winner')?.value?.trim();
+    if (f1 && f2 && fw) { saveFinalPrediction(); }
     showToast(data.success ? t('saved') : '❌ ' + data.error);
   } catch(e) { showToast('❌ ' + e.message); }
 }
 
 document.getElementById('save-quiniela-btn').addEventListener('click', saveQuinielaPicks);
 document.getElementById('save-quiniela-btn2').addEventListener('click', saveQuinielaPicks);
+
+// ── FINAL PREDICTION ─────────────────────────────────────────────────────────
+let myFinalPick = null;
+let finalResult = null;
+
+async function loadFinalPrediction() {
+  try {
+    const [pickRes, resRes] = await Promise.all([
+      authFetch('/api/final-picks/me'),
+      fetch('/api/final-results'),
+    ]);
+    const pd = await pickRes.json();
+    const rd = await resRes.json();
+    myFinalPick = pd.pick || null;
+    finalResult = rd.result || null;
+    renderFinalPrediction();
+  } catch(e) {}
+}
+
+function renderFinalPrediction() {
+  if (myFinalPick) {
+    document.getElementById('fp-finalist1').value = myFinalPick.finalist1 || '';
+    document.getElementById('fp-finalist2').value = myFinalPick.finalist2 || '';
+    document.getElementById('fp-winner').value = myFinalPick.winner || '';
+  }
+  // Show scoring if results are in
+  const resDiv = document.getElementById('final-pick-result');
+  if (finalResult && myFinalPick) {
+    const finalists = [finalResult.finalist1?.toLowerCase().trim(), finalResult.finalist2?.toLowerCase().trim()].filter(Boolean);
+    const pFinalists = [myFinalPick.finalist1?.toLowerCase().trim(), myFinalPick.finalist2?.toLowerCase().trim()].filter(Boolean);
+    let pts = 0;
+    const matched = new Set();
+    for (const pf of pFinalists) {
+      for (const rf of finalists) { if (pf === rf && !matched.has(rf)) { pts += 5; matched.add(rf); break; } }
+    }
+    const winnerCorrect = myFinalPick.winner && finalResult.winner && myFinalPick.winner.toLowerCase().trim() === finalResult.winner.toLowerCase().trim();
+    if (winnerCorrect) pts += 10;
+    resDiv.innerHTML = `<div class="final-result-badge">Actual: <b>${esc(finalResult.finalist1)} vs ${esc(finalResult.finalist2)}</b> · Winner: <b>${esc(finalResult.winner)}</b> · <span class="q-pts-${pts > 0 ? '5' : '0'}">+${pts} pts</span></div>`;
+  } else {
+    resDiv.innerHTML = '';
+  }
+}
+
+async function saveFinalPrediction() {
+  const pick = {
+    finalist1: document.getElementById('fp-finalist1').value.trim(),
+    finalist2: document.getElementById('fp-finalist2').value.trim(),
+    winner: document.getElementById('fp-winner').value.trim(),
+  };
+  if (!pick.finalist1 || !pick.finalist2 || !pick.winner) { showToast('Please fill all 3 fields'); return; }
+  try {
+    const res = await authFetch('/api/final-picks', { method:'POST', body: JSON.stringify({ pick }) });
+    const data = await res.json();
+    myFinalPick = pick;
+    showToast(data.success ? t('saved') : '❌ ' + data.error);
+  } catch(e) { showToast('❌ ' + e.message); }
+}
+
+// Final results admin save
+async function loadFinalResultsPanel() {
+  try {
+    const res = await fetch('/api/final-results');
+    const data = await res.json();
+    finalResult = data.result || null;
+    if (finalResult) {
+      const f1 = document.getElementById('fr-finalist1');
+      const f2 = document.getElementById('fr-finalist2');
+      const fw = document.getElementById('fr-winner');
+      if (f1) f1.value = finalResult.finalist1 || '';
+      if (f2) f2.value = finalResult.finalist2 || '';
+      if (fw) fw.value = finalResult.winner || '';
+    }
+  } catch(e) {}
+}
+
+document.getElementById('save-final-results-btn')?.addEventListener('click', async () => {
+  const result = {
+    finalist1: document.getElementById('fr-finalist1').value.trim(),
+    finalist2: document.getElementById('fr-finalist2').value.trim(),
+    winner: document.getElementById('fr-winner').value.trim(),
+  };
+  if (!result.finalist1 || !result.finalist2 || !result.winner) { showToast('Please fill all 3 fields'); return; }
+  try {
+    const res = await authFetch('/api/final-results', { method:'POST', body: JSON.stringify({ result }) });
+    const data = await res.json();
+    finalResult = result;
+    showToast(data.success ? t('saved') : '❌ ' + data.error);
+  } catch(e) { showToast('❌ ' + e.message); }
+});
 
 // ── RESULTS TABS ──────────────────────────────────────────────────────────────
 document.querySelectorAll('.res-tab-btn').forEach(btn => {
@@ -905,6 +1038,11 @@ function renderQuinielaResultsGrid() {
       const groupLabel = game.phase === 'group' ? `Grp ${game.group}` : game.id;
       const hasResult = result.homeGoals !== undefined && result.homeGoals !== '';
 
+      const isKnockout = game.phase !== 'group';
+      const rh = String(result.homeGoals ?? '').trim();
+      const ra = String(result.awayGoals ?? '').trim();
+      const isResultDraw = isKnockout && rh !== '' && ra !== '' && rh === ra;
+
       const div = document.createElement('div');
       div.className = 'q-game' + (hasResult ? ' has-result' : '');
       div.innerHTML = `
@@ -913,17 +1051,51 @@ function renderQuinielaResultsGrid() {
           <div class="q-team home">${esc(game.home)}</div>
           <div class="q-score-wrap">
             <input class="q-score-input" type="number" min="0" max="20"
-              id="qr-h-${game.id}" value="${result.homeGoals??''}" placeholder="H"/>
+              id="qr-h-${game.id}" value="${result.homeGoals??''}" placeholder="H"
+              data-game="${game.id}" data-side="h"/>
             <span class="q-dash">—</span>
             <input class="q-score-input" type="number" min="0" max="20"
-              id="qr-a-${game.id}" value="${result.awayGoals??''}" placeholder="A"/>
+              id="qr-a-${game.id}" value="${result.awayGoals??''}" placeholder="A"
+              data-game="${game.id}" data-side="a"/>
           </div>
           <div class="q-team away">${esc(game.away)}</div>
         </div>
+        ${isKnockout ? `<div class="q-penalty-row ${isResultDraw ? '' : 'hidden'}" id="pen-res-row-${game.id}">
+          <span class="q-pen-label">⚽ Penalty winner:</span>
+          <div class="q-pen-btns">
+            <button type="button" class="q-pen-btn ${result.penaltyWinner==='home'?'active':''}" data-game="${game.id}" data-pw="home" data-ctx="res">${esc(game.home)}</button>
+            <button type="button" class="q-pen-btn ${result.penaltyWinner==='away'?'active':''}" data-game="${game.id}" data-pw="away" data-ctx="res">${esc(game.away)}</button>
+          </div>
+        </div>` : ''}
       `;
       body.appendChild(div);
     });
     grid.appendChild(body);
+  });
+
+  // Add penalty button/input listeners for results grid
+  grid.querySelectorAll('.q-score-input').forEach(inp => {
+    inp.addEventListener('change', () => {
+      const gameId = inp.dataset.game;
+      const game = ALL_GAMES.find(g => g.id === gameId);
+      if (game && game.phase !== 'group') {
+        const penRow = document.getElementById('pen-res-row-' + gameId);
+        if (penRow) {
+          const h = document.getElementById('qr-h-' + gameId)?.value?.trim() ?? '';
+          const a = document.getElementById('qr-a-' + gameId)?.value?.trim() ?? '';
+          penRow.classList.toggle('hidden', !(h !== '' && a !== '' && h === a));
+        }
+      }
+    });
+  });
+  grid.querySelectorAll('.q-pen-btn[data-ctx="res"]').forEach(btn => {
+    btn.addEventListener('click', () => {
+      const gameId = btn.dataset.game, pw = btn.dataset.pw;
+      if (!quinielaResults[gameId]) quinielaResults[gameId] = {};
+      quinielaResults[gameId].penaltyWinner = pw;
+      const row = document.getElementById('pen-res-row-' + gameId);
+      if (row) row.querySelectorAll('.q-pen-btn').forEach(b => b.classList.toggle('active', b.dataset.pw === pw));
+    });
   });
 }
 
@@ -955,7 +1127,11 @@ document.getElementById('save-quiniela-results-btn').addEventListener('click', a
     const h = document.getElementById(`qr-h-${game.id}`)?.value;
     const a = document.getElementById(`qr-a-${game.id}`)?.value;
     if (h !== '' && h !== undefined && a !== '' && a !== undefined) {
-      results[game.id] = { homeGoals: h, awayGoals: a };
+      const entry = { homeGoals: h, awayGoals: a };
+      if (game.phase !== 'group' && quinielaResults[game.id]?.penaltyWinner) {
+        entry.penaltyWinner = quinielaResults[game.id].penaltyWinner;
+      }
+      results[game.id] = entry;
     }
   });
   try {
@@ -1044,6 +1220,10 @@ function renderEvFilters() {
   html += `<button class="ev-filter-btn ${evFilter==='today'?'active':''}" onclick="setEvFilter('today')">Today</button>`;
   groups.forEach(g => { html += `<button class="ev-filter-btn ${evFilter===g?'active':''}" onclick="setEvFilter('${g}')">Grp ${g}</button>`; });
   html += `<button class="ev-filter-btn ${evFilter==='ko'?'active':''}" onclick="setEvFilter('ko')">KO</button>`;
+  ['r32','r16','qf','sf','3rd','final'].forEach(p => {
+    const labels = {r32:'R32',r16:'R16',qf:'QF',sf:'SF','3rd':'3P',final:'Final'};
+    html += `<button class="ev-filter-btn ${evFilter==='phase-'+p?'active':''}" onclick="setEvFilter('phase-${p}')">${labels[p]}</button>`;
+  });
   el.innerHTML = html;
 }
 
@@ -1067,6 +1247,7 @@ function renderEveryone() {
   if (evFilter === 'all') filtered = games;
   else if (evFilter === 'ko') filtered = games.filter(g => g.phase !== 'group');
   else if (evFilter === 'today') filtered = games.filter(g => g.kickoff && g.kickoff.slice(0, 10) === todayStr);
+  else if (evFilter.startsWith('phase-')) filtered = games.filter(g => g.phase === evFilter.slice(6));
   else filtered = games.filter(g => g.group === evFilter);
 
   // Check if tournament has started
@@ -1368,13 +1549,16 @@ function scoreGame(pick, result, phase) {
   const ph = parseInt(pick.homeGoals), pa = parseInt(pick.awayGoals);
   const rh = parseInt(result.homeGoals), ra = parseInt(result.awayGoals);
   if (isNaN(ph)||isNaN(pa)||isNaN(rh)||isNaN(ra)) return null;
+  let pts = 0;
   // Exact score → 5 pts
-  if (ph === rh && pa === ra) return 5;
+  if (ph === rh && pa === ra) pts = 5;
   // Correct outcome → 3 pts
-  if (getOutcome(ph,pa) === getOutcome(rh,ra)) return 3;
+  else if (getOutcome(ph,pa) === getOutcome(rh,ra)) pts = 3;
   // One team's goals right but wrong outcome → 1 pt
-  if (ph === rh || pa === ra) return 1;
-  return 0;  // max 5 per game
+  else if (ph === rh || pa === ra) pts = 1;
+  // Penalty winner bonus: +1
+  if (phase !== 'group' && result.penaltyWinner && pick.penaltyWinner && result.penaltyWinner === pick.penaltyWinner) pts += 1;
+  return pts;
 }
 function getOutcome(h,a) { return h>a?'H':h<a?'A':'D'; }
 
@@ -1586,7 +1770,7 @@ const EMAIL_TEMPLATES = {
       <h2>🎯 Don't forget your predictions!</h2>
       <p>Games are coming up and some of you haven't submitted predictions yet. Once a match kicks off, your pick for that game <strong>locks permanently</strong>.</p>
       <div class="banner">⏰ Go to the <strong>Quiniela</strong> tab, fill in your scores, and hit <strong>Save</strong>. Takes 5 minutes.</div>
-      <p>Remember: <strong>3 pts</strong> for guessing the correct winner, <strong>5 pts</strong> for the exact score in knockout rounds.</p>
+      <p>Remember: <strong>3 pts</strong> for correct winner, <strong>5 pts</strong> for exact score, <strong>+1 pt</strong> for correct penalty winner in knockouts. Pick the finalists (+5 each) and champion (+10)!</p>
       <p>Don't give free points to everyone else — get your picks in!</p>
       ${buildStandingsHtml(lb)}
     `,
