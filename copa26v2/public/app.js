@@ -317,6 +317,7 @@ document.getElementById('nav-tabs').addEventListener('click', e => {
   if (tab === 'leaderboard') loadLeaderboard();
   if (tab === 'race') loadRace();
   if (tab === 'groups') loadGroups();
+  if (tab === 'bracket') loadBracket();
   if (tab === 'admin') loadAdmin();
   if (tab === 'everyone') loadEveryone();
   if (tab === 'results') { loadAwardsResultsPanel(); loadQuinielaResultsPanel(); loadFinalResultsPanel(); }
@@ -781,7 +782,7 @@ function renderQuinielaGrid() {
       if (result && pick.homeGoals !== undefined && pick.awayGoals !== undefined) { pts = scoreGame(pick, result, game.phase); }
       const tip = getMatchTip(game.home, game.away);
       const kickTime = game.kickoff ? new Date(game.kickoff).toLocaleTimeString(undefined, { hour: '2-digit', minute: '2-digit' }) : '';
-      const groupLabel = game.phase === 'group' ? `Grp ${game.group}` : game.id;
+      const phaseLabels = {r32:'R32',r16:'R16',qf:'QF',sf:'SF','3rd':'3rd',final:'Final 🏆'}; const groupLabel = game.phase === 'group' ? `Grp ${game.group}` : (phaseLabels[game.phase] || game.id);
 
       const isKnockout = game.phase !== 'group';
       const pickH = String(pick.homeGoals ?? '').trim();
@@ -1072,7 +1073,7 @@ function renderQuinielaResultsGrid() {
     dayGames.forEach(game => {
       const result = quinielaResults[game.id] || {};
       const kickTime = game.kickoff ? new Date(game.kickoff).toLocaleTimeString(undefined, { hour: '2-digit', minute: '2-digit' }) : '';
-      const groupLabel = game.phase === 'group' ? `Grp ${game.group}` : game.id;
+      const phaseLabels = {r32:'R32',r16:'R16',qf:'QF',sf:'SF','3rd':'3rd',final:'Final 🏆'}; const groupLabel = game.phase === 'group' ? `Grp ${game.group}` : (phaseLabels[game.phase] || game.id);
       const hasResult = result.homeGoals !== undefined && result.homeGoals !== '';
 
       const isKnockout = game.phase !== 'group';
@@ -1358,7 +1359,8 @@ function renderEveryone() {
     html += `</tr></thead><tbody>`;
 
     dayGames.forEach(g => {
-      const grpLabel = g.phase === 'group' ? `Grp ${g.group}` : g.id;
+      const evPhaseLabels = {r32:'R32',r16:'R16',qf:'QF',sf:'SF','3rd':'3rd',final:'Final 🏆'};
+      const grpLabel = g.phase === 'group' ? `Grp ${g.group}` : (evPhaseLabels[g.phase] || g.id);
       html += `<tr${!g.locked ? ' class="ev-upcoming-row"' : ''}>`;
       // Match info
       html += `<td><div class="ev-match-cell"><span class="ev-grp-badge">${grpLabel}</span><span class="ev-teams">${g.home} <span class="ev-vs">v</span> ${g.away}</span></div></td>`;
@@ -1621,6 +1623,159 @@ function showToast(msg) {
 }
 
 
+// ── BRACKET VIEW ──────────────────────────────────────────────────────────────
+// FIFA 2026 bracket mapping: our R32_XX = FIFA Match (72+XX)
+// R16 feeds: Winner of two R32 games. QF feeds: Winner of two R16 games, etc.
+const BRACKET_TREE = [
+  // Each entry: [round columns from R32→Final]
+  // TOP HALF → SF_1
+  {
+    label: 'Path A',
+    r32: ['R32_02','R32_05','R32_01','R32_03','R32_04','R32_06','R32_07','R32_08'],
+    r16: [
+      { id:'R16_01', from:['R32_02','R32_05'] },
+      { id:'R16_02', from:['R32_01','R32_03'] },
+      { id:'R16_03', from:['R32_04','R32_06'] },
+      { id:'R16_04', from:['R32_07','R32_08'] },
+    ],
+    qf: [
+      { id:'QF_1', from:['R16_01','R16_02'] },
+      { id:'QF_3', from:['R16_03','R16_04'] },
+    ],
+    sf: { id:'SF_1', from:['QF_1','QF_3'] },
+  },
+  // BOTTOM HALF → SF_2
+  {
+    label: 'Path B',
+    r32: ['R32_11','R32_12','R32_09','R32_10','R32_14','R32_16','R32_13','R32_15'],
+    r16: [
+      { id:'R16_05', from:['R32_11','R32_12'] },
+      { id:'R16_06', from:['R32_09','R32_10'] },
+      { id:'R16_07', from:['R32_14','R32_16'] },
+      { id:'R16_08', from:['R32_13','R32_15'] },
+    ],
+    qf: [
+      { id:'QF_2', from:['R16_05','R16_06'] },
+      { id:'QF_4', from:['R16_07','R16_08'] },
+    ],
+    sf: { id:'SF_2', from:['QF_2','QF_4'] },
+  },
+];
+
+async function loadBracket() {
+  // Fetch knockout team names and results
+  try {
+    const [teamsRes, resultsRes] = await Promise.all([
+      fetch('/api/admin/knockout-teams'),
+      fetch('/api/quiniela/results'),
+    ]);
+    const teamsData = await teamsRes.json();
+    const resultsData = await resultsRes.json();
+    const teams = teamsData.teams || {};
+    const results = resultsData.results || {};
+    renderBracket(teams, results);
+  } catch(e) { console.error('Bracket load error', e); }
+}
+
+function getBracketTeam(gameId, side, teams) {
+  // Check admin-set names first, fall back to default
+  if (teams[gameId]?.[side]) return teams[gameId][side];
+  const game = ALL_GAMES.find(g => g.id === gameId);
+  return game ? game[side] : 'TBD';
+}
+
+function getWinner(gameId, teams, results) {
+  const r = results[gameId];
+  if (!r || r.homeGoals === undefined || r.homeGoals === '') return null;
+  const h = parseInt(r.homeGoals), a = parseInt(r.awayGoals);
+  if (isNaN(h) || isNaN(a)) return null;
+  if (h > a) return getBracketTeam(gameId, 'home', teams);
+  if (a > h) return getBracketTeam(gameId, 'away', teams);
+  // Draw → penalty winner
+  if (r.penaltyWinner === 'home') return getBracketTeam(gameId, 'home', teams);
+  if (r.penaltyWinner === 'away') return getBracketTeam(gameId, 'away', teams);
+  return null; // draw with no penalty winner set yet
+}
+
+function bracketGameCard(gameId, teams, results, roundLabel) {
+  const home = getBracketTeam(gameId, 'home', teams);
+  const away = getBracketTeam(gameId, 'away', teams);
+  const r = results[gameId];
+  const hasResult = r && r.homeGoals !== undefined && r.homeGoals !== '';
+  const winner = getWinner(gameId, teams, results);
+  const homeWon = winner === home && winner !== 'TBD';
+  const awayWon = winner === away && winner !== 'TBD';
+  const pen = hasResult && r.penaltyWinner ? ' (P)' : '';
+
+  return `<div class="bk-game" data-game="${gameId}">
+    <div class="bk-round-tag">${roundLabel}</div>
+    <div class="bk-team ${homeWon ? 'bk-winner' : ''} ${hasResult && !homeWon ? 'bk-loser' : ''}">
+      <span class="bk-name">${esc(home)}</span>
+      ${hasResult ? `<span class="bk-score">${r.homeGoals}</span>` : ''}
+    </div>
+    <div class="bk-team ${awayWon ? 'bk-winner' : ''} ${hasResult && !awayWon ? 'bk-loser' : ''}">
+      <span class="bk-name">${esc(away)}</span>
+      ${hasResult ? `<span class="bk-score">${r.awayGoals}${pen}</span>` : ''}
+    </div>
+  </div>`;
+}
+
+function renderBracket(teams, results) {
+  const container = document.getElementById('bracket-content');
+  if (!container) return;
+
+  let html = '';
+
+  // Render each half of the bracket
+  BRACKET_TREE.forEach((half, hi) => {
+    html += `<div class="bk-half">`;
+    html += `<div class="bk-half-label">${half.label}</div>`;
+    html += `<div class="bk-columns">`;
+
+    // R32 column
+    html += `<div class="bk-round bk-r32"><div class="bk-round-header">R32</div>`;
+    half.r32.forEach(id => { html += bracketGameCard(id, teams, results, 'R32'); });
+    html += `</div>`;
+
+    // R16 column
+    html += `<div class="bk-round bk-r16"><div class="bk-round-header">R16</div>`;
+    half.r16.forEach(g => { html += bracketGameCard(g.id, teams, results, 'R16'); });
+    html += `</div>`;
+
+    // QF column
+    html += `<div class="bk-round bk-qf"><div class="bk-round-header">QF</div>`;
+    half.qf.forEach(g => { html += bracketGameCard(g.id, teams, results, 'QF'); });
+    html += `</div>`;
+
+    // SF column
+    html += `<div class="bk-round bk-sf"><div class="bk-round-header">SF</div>`;
+    html += bracketGameCard(half.sf.id, teams, results, 'SF');
+    html += `</div>`;
+
+    html += `</div></div>`;
+  });
+
+  // Final + 3rd place
+  html += `<div class="bk-final-row">`;
+  html += `<div class="bk-final-card">`;
+  html += `<div class="bk-round-header">🏆 FINAL</div>`;
+  html += bracketGameCard('FINAL', teams, results, 'Final');
+  html += `</div>`;
+  html += `<div class="bk-final-card bk-3rd">`;
+  html += `<div class="bk-round-header">3rd Place</div>`;
+  html += bracketGameCard('3RD', teams, results, '3rd');
+  html += `</div>`;
+  html += `</div>`;
+
+  // Legend
+  html += `<div class="bk-legend">
+    <p>Each R32 winner advances right → into the R16 slot. R16 winners → QF → SF → Final.</p>
+    <p>Bracket path: the two R32 games in each pair feed into the R16 game to their right, and so on.</p>
+  </div>`;
+
+  container.innerHTML = html;
+}
+
 // ── KNOCKOUT TEAM EDITOR ──────────────────────────────────────────────────────
 let savedKnockoutTeams = {};
 
@@ -1641,17 +1796,30 @@ function renderKnockoutEditor() {
   const games = ALL_GAMES.filter(g => g.phase === phase);
   grid.innerHTML = '';
 
+  // Bracket path map for admin reference
+  const bracketPath = {
+    'R32_01':'→ R16_02','R32_02':'→ R16_01','R32_03':'→ R16_02','R32_04':'→ R16_03',
+    'R32_05':'→ R16_01','R32_06':'→ R16_03','R32_07':'→ R16_04','R32_08':'→ R16_04',
+    'R32_09':'→ R16_06','R32_10':'→ R16_06','R32_11':'→ R16_05','R32_12':'→ R16_05',
+    'R32_13':'→ R16_08','R32_14':'→ R16_07','R32_15':'→ R16_08','R32_16':'→ R16_07',
+    'R16_01':'→ QF_1','R16_02':'→ QF_1','R16_03':'→ QF_3','R16_04':'→ QF_3',
+    'R16_05':'→ QF_2','R16_06':'→ QF_2','R16_07':'→ QF_4','R16_08':'→ QF_4',
+    'QF_1':'→ SF_1','QF_2':'→ SF_2','QF_3':'→ SF_1','QF_4':'→ SF_2',
+    'SF_1':'→ FINAL','SF_2':'→ FINAL',
+  };
+
   games.forEach(game => {
     const saved = savedKnockoutTeams[game.id] || {};
     const currentHome = saved.home || game.home;
     const currentAway = saved.away || game.away;
     const isDefault = game.home.includes('Home') || game.home.includes('TBD');
     const hasReal = saved.home && !saved.home.includes('Home');
+    const pathInfo = bracketPath[game.id] || '';
 
     const div = document.createElement('div');
     div.className = 'knockout-game-row';
     div.innerHTML = `
-      <div class="knockout-game-label">${currentLang==='es' ? game.labelEs : game.label}</div>
+      <div class="knockout-game-label">${currentLang==='es' ? game.labelEs : game.label}${pathInfo ? ` <span class="ko-path-info">${pathInfo}</span>` : ''}</div>
       <div class="knockout-team-inputs">
         <input type="text" 
           id="ko-home-${game.id}" 
