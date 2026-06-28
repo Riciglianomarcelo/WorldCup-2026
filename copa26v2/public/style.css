@@ -1381,95 +1381,98 @@ button, [role="button"], .tab-btn, .btn-green, .btn-ghost, .lang-btn,
   .q-penalty-row { flex-wrap: wrap; }
 }
 
-/* ═══ BRACKET VIEW ═══ */
-.bracket-scroll { overflow-x: auto; padding-bottom: 16px; }
-.bk-half { margin-bottom: 24px; }
-.bk-half-label {
-  font-size: 13px; font-weight: 700; text-transform: uppercase;
-  color: var(--text-2); letter-spacing: 1px; margin-bottom: 8px;
-  padding: 4px 12px; background: var(--surface); border-radius: 6px;
-  display: inline-block;
+
+/* ═══ FIFA-STYLE BRACKET ═══ */
+.bracket-scroll { overflow-x: auto; -webkit-overflow-scrolling: touch; padding: 8px 0 16px; }
+.bk-wrap {
+  display: flex; align-items: center; gap: 0;
+  min-width: 1200px; padding: 0 8px;
 }
-.bk-columns {
-  display: flex; gap: 6px; min-width: 700px;
-  align-items: stretch;
-}
-.bk-round {
+
+/* Each half: R32 → R16 → QF → SF */
+.bk-half { display: flex; flex: 1; }
+.bk-half.bk-mirror { flex-direction: row-reverse; }
+.bk-half.bk-mirror .bk-seed::after { right: auto; left: -18px; border-right: none; border-left: 2px solid var(--border); border-radius: 6px 0 0 6px; }
+.bk-half.bk-mirror .bk-col { padding-right: 0; padding-left: 24px; }
+.bk-half.bk-mirror .bk-c0 { padding-left: 0; }
+
+/* Round column */
+.bk-col {
   display: flex; flex-direction: column; justify-content: space-around;
-  flex: 1; min-width: 140px; gap: 4px;
+  min-width: 130px; padding-right: 24px; position: relative;
 }
-.bk-round-header {
-  text-align: center; font-size: 11px; font-weight: 700;
-  color: var(--text-3); text-transform: uppercase; letter-spacing: 1px;
-  padding: 4px 0; margin-bottom: 2px;
+.bk-c0 { min-width: 140px; }
+.bk-hdr {
+  text-align: center; font-size: 10px; font-weight: 700;
+  text-transform: uppercase; letter-spacing: 1.5px;
+  color: var(--text-3); padding: 0 0 6px; position: sticky; top: 0;
 }
-.bk-game {
+
+/* Seed = pair of games whose winners feed the next round */
+.bk-seed {
+  display: flex; flex-direction: column; justify-content: center;
+  flex: 1; position: relative; gap: 4px; padding: 4px 0;
+}
+/* Connector bracket line on the right of each seed */
+.bk-seed::after {
+  content: '';
+  position: absolute; right: -18px;
+  top: 25%; bottom: 25%;
+  width: 16px;
+  border: 2px solid var(--border);
+  border-left: none;
+  border-radius: 0 6px 6px 0;
+}
+/* SF column seeds don't need connectors */
+.bk-c3 .bk-seed::after { display: none; }
+/* Single-game columns (QF, SF) don't need seed connectors when there's only 1 game */
+.bk-c3 { justify-content: center; padding-right: 12px; }
+.bk-half.bk-mirror .bk-c3 { padding-left: 12px; padding-right: 0; }
+
+/* Game card */
+.bk-card {
   background: var(--surface); border: 1.5px solid var(--border);
-  border-radius: 8px; overflow: hidden; flex-shrink: 0;
-  position: relative;
+  border-radius: 6px; overflow: hidden; min-width: 120px;
 }
-.bk-game .bk-round-tag {
-  display: none; /* header already shows round */
-}
-.bk-team {
+.bk-t {
   display: flex; justify-content: space-between; align-items: center;
-  padding: 6px 10px; font-size: 12px; font-weight: 500;
-  color: var(--text); border-bottom: 1px solid var(--border);
-  min-height: 28px;
+  padding: 5px 8px; font-size: 12px; font-weight: 500; color: var(--text);
+  border-bottom: 1px solid var(--border); min-height: 24px;
+  white-space: nowrap; overflow: hidden;
 }
-.bk-team:last-child { border-bottom: none; }
-.bk-name { flex: 1; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
-.bk-score {
-  font-weight: 700; font-size: 13px; min-width: 20px; text-align: center;
-  margin-left: 6px; color: var(--gold, #C9A84C);
-}
-.bk-winner {
-  background: rgba(var(--green-rgb, 76,175,80), 0.12);
-  font-weight: 700;
-}
-.bk-winner .bk-name { color: var(--green); }
-.bk-loser { opacity: 0.5; }
+.bk-t:last-child { border-bottom: none; }
+.bk-t span { overflow: hidden; text-overflow: ellipsis; flex: 1; }
+.bk-t b { font-weight: 700; font-size: 13px; color: var(--gold, #C9A84C); margin-left: 6px; flex-shrink: 0; }
+.bk-t.bk-w { background: rgba(var(--green-rgb, 76,175,80), 0.12); }
+.bk-t.bk-w span { color: var(--green); font-weight: 700; }
+.bk-t.bk-l { opacity: 0.45; }
 
-/* Connector lines between rounds */
-.bk-r32 .bk-game { margin: 1px 0; }
-.bk-r16 .bk-game { margin: 4px 0; }
-.bk-qf .bk-game { margin: 12px 0; }
-.bk-sf .bk-game { margin: 24px 0; }
-
-.bk-round { position: relative; }
-.bk-round::before {
-  content: ''; position: absolute; left: -4px; top: 0; bottom: 0;
-  width: 3px; border-left: 2px solid var(--border);
-  border-radius: 2px;
+/* Center: Final + 3rd */
+.bk-center {
+  display: flex; flex-direction: column; align-items: center;
+  justify-content: center; padding: 0 16px; gap: 16px; min-width: 160px;
 }
-.bk-r32::before { display: none; }
-
-/* Final row */
-.bk-final-row {
-  display: flex; gap: 16px; justify-content: center;
-  flex-wrap: wrap; margin-top: 16px;
+.bk-final-label {
+  font-size: 16px; font-weight: 800; color: var(--gold, #C9A84C);
+  text-align: center;
 }
-.bk-final-card {
-  min-width: 200px; max-width: 300px; flex: 1;
+.bk-3rd-label {
+  font-size: 11px; font-weight: 600; color: var(--text-3);
+  text-align: center; text-transform: uppercase; letter-spacing: 1px;
+  margin-top: 8px;
 }
-.bk-final-card .bk-game {
-  border-color: var(--gold, #C9A84C); border-width: 2px;
-}
-.bk-3rd .bk-game { border-color: var(--border); border-width: 1.5px; }
-.bk-legend {
-  margin-top: 16px; padding: 12px; font-size: 12px;
-  color: var(--text-3); line-height: 1.5;
-}
-.bk-legend p { margin: 0 0 4px; }
-
-@media (max-width: 600px) {
-  .bk-columns { min-width: 580px; gap: 4px; }
-  .bk-round { min-width: 110px; }
-  .bk-team { padding: 4px 6px; font-size: 11px; }
-}
+.bk-center .bk-card { min-width: 150px; }
+.bk-center .bk-card:first-of-type { border-color: var(--gold, #C9A84C); border-width: 2px; }
 
 /* Bracket path info in knockout editor */
 .ko-path-info {
   font-size: 11px; color: var(--green); font-weight: 600;
   opacity: 0.7; margin-left: 4px;
+}
+
+@media (max-width: 600px) {
+  .bk-wrap { min-width: 1000px; }
+  .bk-col { min-width: 100px; padding-right: 16px; }
+  .bk-t { font-size: 11px; padding: 4px 6px; }
+  .bk-center { padding: 0 8px; min-width: 120px; }
 }
