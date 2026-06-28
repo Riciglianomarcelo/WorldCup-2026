@@ -1310,3 +1310,73 @@ button, [role="button"], .tab-btn, .btn-green, .btn-ghost, .lang-btn,
 .select-input, input[type="text"], input[type="email"], input[type="number"] {
   min-height: 36px;
 }
+
+/* ═══ PENALTY WINNER PICKER ═══ */
+.q-penalty-row {
+  display: flex; align-items: center; gap: 8px;
+  padding: 6px 12px 8px; margin-top: 2px;
+  background: var(--surface-2, rgba(var(--green-rgb, 76,175,80), 0.06));
+  border-radius: 0 0 8px 8px;
+}
+.q-penalty-row.hidden { display: none; }
+.q-pen-label {
+  font-size: 12px; color: var(--text-2); white-space: nowrap; font-weight: 600;
+}
+.q-pen-btns { display: flex; gap: 6px; flex: 1; }
+.q-pen-btn {
+  flex: 1; padding: 5px 8px; border-radius: 6px;
+  border: 1.5px solid var(--border); background: var(--surface);
+  color: var(--text); font-size: 12px; font-weight: 600;
+  cursor: pointer; transition: all .15s; text-align: center;
+  min-height: 32px;
+}
+.q-pen-btn:hover { border-color: var(--green); }
+.q-pen-btn.active {
+  background: var(--green); color: #fff; border-color: var(--green);
+}
+
+/* ═══ FINAL PREDICTION ═══ */
+.final-prediction-section {
+  margin: 24px 0 16px; padding: 20px;
+  background: var(--surface); border: 1.5px solid var(--border);
+  border-radius: 12px;
+}
+.final-prediction-section h3 {
+  margin: 0 0 6px; font-size: 18px; color: var(--text);
+}
+.final-pick-grid {
+  display: grid; grid-template-columns: 1fr 1fr; gap: 12px;
+  margin-top: 12px;
+}
+.final-pick-item label {
+  display: block; font-size: 12px; font-weight: 600;
+  color: var(--text-2); margin-bottom: 4px; text-transform: uppercase;
+  letter-spacing: 0.5px;
+}
+.final-pick-input {
+  width: 100%; padding: 8px 12px; border-radius: 8px;
+  border: 1.5px solid var(--border); background: var(--bg);
+  color: var(--text); font-size: 14px; font-family: var(--font);
+  box-sizing: border-box;
+}
+.final-pick-input:focus {
+  border-color: var(--green); outline: none;
+  box-shadow: 0 0 0 2px rgba(var(--green-rgb, 76,175,80), 0.15);
+}
+.final-pick-item.final-pick-winner {
+  grid-column: 1 / -1;
+}
+.final-pick-item.final-pick-winner .final-pick-input {
+  border-color: var(--gold, #C9A84C); font-weight: 700; font-size: 16px;
+}
+.final-pick-result { margin-top: 12px; }
+.final-result-badge {
+  padding: 10px 14px; border-radius: 8px;
+  background: var(--surface-2, rgba(var(--green-rgb, 76,175,80), 0.06));
+  font-size: 13px; color: var(--text); line-height: 1.5;
+}
+
+@media (max-width: 600px) {
+  .final-pick-grid { grid-template-columns: 1fr; }
+  .q-penalty-row { flex-wrap: wrap; }
+}
