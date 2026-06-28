@@ -549,7 +549,7 @@ function renderLeaderboard(data) {
       </div>
       <div class="lb-score-wrap">
         <div class="lb-total">${p.totalScore || '—'}</div>
-        <div class="lb-breakdown">${p.awardsScore} ${t('awards_pts')} + ${p.quinielaScore} ${t('quiniela_pts')}${p.finalScore ? ' + ' + p.finalScore + ' Final' : ''}</div>
+        <div class="lb-breakdown">${p.awardsScore} ${t('awards_pts')} + ${p.quinielaScore} ${t('quiniela_pts')}${p.finalScore ? ' + ' + p.finalScore + ' Final' : ''}${p.todayPts ? ' · <span class="lb-today">+' + p.todayPts + ' today</span>' : ''}</div>
       </div>
     </div>`;
   });
