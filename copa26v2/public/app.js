@@ -1624,156 +1624,129 @@ function showToast(msg) {
 
 
 // ── BRACKET VIEW ──────────────────────────────────────────────────────────────
-// FIFA 2026 bracket mapping: our R32_XX = FIFA Match (72+XX)
-// R16 feeds: Winner of two R32 games. QF feeds: Winner of two R16 games, etc.
-const BRACKET_TREE = [
-  // Each entry: [round columns from R32→Final]
-  // TOP HALF → SF_1
-  {
-    label: 'Path A',
-    r32: ['R32_02','R32_05','R32_01','R32_03','R32_04','R32_06','R32_07','R32_08'],
-    r16: [
-      { id:'R16_01', from:['R32_02','R32_05'] },
-      { id:'R16_02', from:['R32_01','R32_03'] },
-      { id:'R16_03', from:['R32_04','R32_06'] },
-      { id:'R16_04', from:['R32_07','R32_08'] },
-    ],
-    qf: [
-      { id:'QF_1', from:['R16_01','R16_02'] },
-      { id:'QF_3', from:['R16_03','R16_04'] },
-    ],
-    sf: { id:'SF_1', from:['QF_1','QF_3'] },
+// Exact FIFA 2026 bracket structure. Our R32_XX = FIFA Match (72+XX).
+// Layout: R32 → R16 → QF → SF → FINAL ← SF ← QF ← R16 ← R32
+
+const BRACKET_LEFT = {
+  // Upper-left quadrant → QF_1
+  upper: {
+    r32: [['R32_02','R32_05'],['R32_01','R32_03']],  // pairs that feed R16
+    r16: ['R16_01','R16_02'],
+    qf: 'QF_1',
   },
-  // BOTTOM HALF → SF_2
-  {
-    label: 'Path B',
-    r32: ['R32_11','R32_12','R32_09','R32_10','R32_14','R32_16','R32_13','R32_15'],
-    r16: [
-      { id:'R16_05', from:['R32_11','R32_12'] },
-      { id:'R16_06', from:['R32_09','R32_10'] },
-      { id:'R16_07', from:['R32_14','R32_16'] },
-      { id:'R16_08', from:['R32_13','R32_15'] },
-    ],
-    qf: [
-      { id:'QF_2', from:['R16_05','R16_06'] },
-      { id:'QF_4', from:['R16_07','R16_08'] },
-    ],
-    sf: { id:'SF_2', from:['QF_2','QF_4'] },
+  // Lower-left quadrant → QF_3 (note: QF3, not QF2 — FIFA path)
+  lower: {
+    r32: [['R32_04','R32_06'],['R32_07','R32_08']],
+    r16: ['R16_03','R16_04'],
+    qf: 'QF_3',
   },
-];
+  sf: 'SF_1',
+};
+
+const BRACKET_RIGHT = {
+  upper: {
+    r32: [['R32_11','R32_12'],['R32_09','R32_10']],
+    r16: ['R16_05','R16_06'],
+    qf: 'QF_2',
+  },
+  lower: {
+    r32: [['R32_14','R32_16'],['R32_13','R32_15']],
+    r16: ['R16_07','R16_08'],
+    qf: 'QF_4',
+  },
+  sf: 'SF_2',
+};
 
 async function loadBracket() {
-  // Fetch knockout team names and results
   try {
     const [teamsRes, resultsRes] = await Promise.all([
       fetch('/api/admin/knockout-teams'),
       fetch('/api/quiniela/results'),
     ]);
-    const teamsData = await teamsRes.json();
-    const resultsData = await resultsRes.json();
-    const teams = teamsData.teams || {};
-    const results = resultsData.results || {};
-    renderBracket(teams, results);
-  } catch(e) { console.error('Bracket load error', e); }
+    const td = await teamsRes.json();
+    const rd = await resultsRes.json();
+    renderBracket(td.teams || {}, rd.results || {});
+  } catch(e) { console.error(e); }
 }
 
-function getBracketTeam(gameId, side, teams) {
-  // Check admin-set names first, fall back to default
-  if (teams[gameId]?.[side]) return teams[gameId][side];
-  const game = ALL_GAMES.find(g => g.id === gameId);
-  return game ? game[side] : 'TBD';
+function bkTeam(gid, side, tm) {
+  if (tm[gid]?.[side]) return tm[gid][side];
+  const g = ALL_GAMES.find(x => x.id === gid);
+  return g ? g[side] : 'TBD';
 }
 
-function getWinner(gameId, teams, results) {
-  const r = results[gameId];
-  if (!r || r.homeGoals === undefined || r.homeGoals === '') return null;
-  const h = parseInt(r.homeGoals), a = parseInt(r.awayGoals);
-  if (isNaN(h) || isNaN(a)) return null;
-  if (h > a) return getBracketTeam(gameId, 'home', teams);
-  if (a > h) return getBracketTeam(gameId, 'away', teams);
-  // Draw → penalty winner
-  if (r.penaltyWinner === 'home') return getBracketTeam(gameId, 'home', teams);
-  if (r.penaltyWinner === 'away') return getBracketTeam(gameId, 'away', teams);
-  return null; // draw with no penalty winner set yet
+function bkWinner(gid, tm, res) {
+  const r = res[gid];
+  if (!r || r.homeGoals === '' || r.homeGoals === undefined) return null;
+  const h = +r.homeGoals, a = +r.awayGoals;
+  if (isNaN(h)||isNaN(a)) return null;
+  if (h > a) return 'home'; if (a > h) return 'away';
+  return r.penaltyWinner || null;
 }
 
-function bracketGameCard(gameId, teams, results, roundLabel) {
-  const home = getBracketTeam(gameId, 'home', teams);
-  const away = getBracketTeam(gameId, 'away', teams);
-  const r = results[gameId];
-  const hasResult = r && r.homeGoals !== undefined && r.homeGoals !== '';
-  const winner = getWinner(gameId, teams, results);
-  const homeWon = winner === home && winner !== 'TBD';
-  const awayWon = winner === away && winner !== 'TBD';
-  const pen = hasResult && r.penaltyWinner ? ' (P)' : '';
-
-  return `<div class="bk-game" data-game="${gameId}">
-    <div class="bk-round-tag">${roundLabel}</div>
-    <div class="bk-team ${homeWon ? 'bk-winner' : ''} ${hasResult && !homeWon ? 'bk-loser' : ''}">
-      <span class="bk-name">${esc(home)}</span>
-      ${hasResult ? `<span class="bk-score">${r.homeGoals}</span>` : ''}
-    </div>
-    <div class="bk-team ${awayWon ? 'bk-winner' : ''} ${hasResult && !awayWon ? 'bk-loser' : ''}">
-      <span class="bk-name">${esc(away)}</span>
-      ${hasResult ? `<span class="bk-score">${r.awayGoals}${pen}</span>` : ''}
-    </div>
+function bkCard(gid, tm, res) {
+  const home = bkTeam(gid, 'home', tm), away = bkTeam(gid, 'away', tm);
+  const r = res[gid], has = r && r.homeGoals !== undefined && r.homeGoals !== '';
+  const w = bkWinner(gid, tm, res);
+  const pen = has && r.penaltyWinner ? ' <small>(P)</small>' : '';
+  return `<div class="bk-card">
+    <div class="bk-t ${w==='home'?'bk-w':''}${has&&w!=='home'?' bk-l':''}"><span>${esc(home)}</span>${has?`<b>${r.homeGoals}</b>`:''}</div>
+    <div class="bk-t ${w==='away'?'bk-w':''}${has&&w!=='away'?' bk-l':''}"><span>${esc(away)}</span>${has?`<b>${r.awayGoals}${pen}</b>`:''}</div>
   </div>`;
 }
 
-function renderBracket(teams, results) {
-  const container = document.getElementById('bracket-content');
-  if (!container) return;
+function bkHalf(data, tm, res, mirror) {
+  const dir = mirror ? 'bk-mirror' : '';
+  let h = `<div class="bk-half ${dir}">`;
 
-  let html = '';
-
-  // Render each half of the bracket
-  BRACKET_TREE.forEach((half, hi) => {
-    html += `<div class="bk-half">`;
-    html += `<div class="bk-half-label">${half.label}</div>`;
-    html += `<div class="bk-columns">`;
-
-    // R32 column
-    html += `<div class="bk-round bk-r32"><div class="bk-round-header">R32</div>`;
-    half.r32.forEach(id => { html += bracketGameCard(id, teams, results, 'R32'); });
-    html += `</div>`;
-
-    // R16 column
-    html += `<div class="bk-round bk-r16"><div class="bk-round-header">R16</div>`;
-    half.r16.forEach(g => { html += bracketGameCard(g.id, teams, results, 'R16'); });
-    html += `</div>`;
-
-    // QF column
-    html += `<div class="bk-round bk-qf"><div class="bk-round-header">QF</div>`;
-    half.qf.forEach(g => { html += bracketGameCard(g.id, teams, results, 'QF'); });
-    html += `</div>`;
-
-    // SF column
-    html += `<div class="bk-round bk-sf"><div class="bk-round-header">SF</div>`;
-    html += bracketGameCard(half.sf.id, teams, results, 'SF');
-    html += `</div>`;
-
-    html += `</div></div>`;
+  // R32 column
+  h += `<div class="bk-col bk-c0"><div class="bk-hdr">R32</div>`;
+  [...data.upper.r32, ...data.lower.r32].forEach(pair => {
+    h += `<div class="bk-seed">`;
+    pair.forEach(gid => { h += bkCard(gid, tm, res); });
+    h += `</div>`;
   });
+  h += `</div>`;
 
-  // Final + 3rd place
-  html += `<div class="bk-final-row">`;
-  html += `<div class="bk-final-card">`;
-  html += `<div class="bk-round-header">🏆 FINAL</div>`;
-  html += bracketGameCard('FINAL', teams, results, 'Final');
-  html += `</div>`;
-  html += `<div class="bk-final-card bk-3rd">`;
-  html += `<div class="bk-round-header">3rd Place</div>`;
-  html += bracketGameCard('3RD', teams, results, '3rd');
-  html += `</div>`;
-  html += `</div>`;
+  // R16 column
+  h += `<div class="bk-col bk-c1"><div class="bk-hdr">R16</div>`;
+  h += `<div class="bk-seed">`;
+  data.upper.r16.forEach(gid => { h += bkCard(gid, tm, res); });
+  h += `</div><div class="bk-seed">`;
+  data.lower.r16.forEach(gid => { h += bkCard(gid, tm, res); });
+  h += `</div></div>`;
 
-  // Legend
-  html += `<div class="bk-legend">
-    <p>Each R32 winner advances right → into the R16 slot. R16 winners → QF → SF → Final.</p>
-    <p>Bracket path: the two R32 games in each pair feed into the R16 game to their right, and so on.</p>
-  </div>`;
+  // QF column
+  h += `<div class="bk-col bk-c2"><div class="bk-hdr">QF</div>`;
+  h += `<div class="bk-seed">`;
+  h += bkCard(data.upper.qf, tm, res);
+  h += bkCard(data.lower.qf, tm, res);
+  h += `</div></div>`;
 
-  container.innerHTML = html;
+  // SF column
+  h += `<div class="bk-col bk-c3"><div class="bk-hdr">SF</div>`;
+  h += bkCard(data.sf, tm, res);
+  h += `</div>`;
+
+  h += `</div>`;
+  return h;
+}
+
+function renderBracket(tm, res) {
+  const c = document.getElementById('bracket-content');
+  if (!c) return;
+  let h = `<div class="bk-wrap">`;
+  h += bkHalf(BRACKET_LEFT, tm, res, false);
+  // Final column
+  h += `<div class="bk-center">`;
+  h += `<div class="bk-final-label">🏆 FINAL</div>`;
+  h += bkCard('FINAL', tm, res);
+  h += `<div class="bk-3rd-label">3rd Place</div>`;
+  h += bkCard('3RD', tm, res);
+  h += `</div>`;
+  h += bkHalf(BRACKET_RIGHT, tm, res, true);
+  h += `</div>`;
+  c.innerHTML = h;
 }
 
 // ── KNOCKOUT TEAM EDITOR ──────────────────────────────────────────────────────
