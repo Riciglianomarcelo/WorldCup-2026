@@ -1476,3 +1476,8 @@ button, [role="button"], .tab-btn, .btn-green, .btn-ghost, .lang-btn,
   .bk-t { font-size: 11px; padding: 4px 6px; }
   .bk-center { padding: 0 8px; min-width: 120px; }
 }
+
+/* Today's points in leaderboard */
+.lb-today {
+  color: var(--green); font-weight: 700;
+}
