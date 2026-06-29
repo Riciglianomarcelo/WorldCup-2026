@@ -1481,3 +1481,9 @@ button, [role="button"], .tab-btn, .btn-green, .btn-ghost, .lang-btn,
 .lb-today {
   color: var(--green); font-weight: 700;
 }
+
+/* Date/time info in knockout editor */
+.ko-date-info {
+  font-size: 11px; color: var(--gold, #C9A84C); font-weight: 600;
+  margin-left: 4px;
+}
