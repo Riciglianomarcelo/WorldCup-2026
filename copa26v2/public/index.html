@@ -342,6 +342,22 @@
       <div id="knockout-teams-grid" class="knockout-grid"></div>
     </div>
 
+    <!-- FIX PLAYER PICKS -->
+    <div class="fix-picks-section">
+      <h3 class="section-title">🔧 Fix Player Picks</h3>
+      <p class="tab-desc" style="margin:4px 0 12px">Edit any player's predictions — even for locked games. Use this to restore picks lost during slot changes.</p>
+      <div class="fix-picks-controls">
+        <select id="fix-picks-user" class="select-input" style="flex:1">
+          <option value="">Select a player…</option>
+        </select>
+        <button id="fix-picks-load" class="btn-ghost">Load Picks</button>
+      </div>
+      <div id="fix-picks-grid" class="quiniela-grid" style="margin-top:12px"></div>
+      <div id="fix-picks-footer" class="hidden" style="margin-top:12px;text-align:center">
+        <button id="fix-picks-save" class="btn-green btn-lg">💾 Save Fixed Picks</button>
+      </div>
+    </div>
+
     <h3 class="section-title" data-i18n="all_players">👥 All Players</h3>
     <div id="admin-players"></div>
   </div>
