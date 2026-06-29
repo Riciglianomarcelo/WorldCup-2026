@@ -8,6 +8,18 @@ let CATEGORIES = [];
 let ALL_GAMES = [];
 let myAwardsPicks = {};
 let myQuinielaPicks = {};
+
+// ── DATE HELPERS ─────────────────────────────────────────────────────────────
+// Convert UTC kickoff to local YYYY-MM-DD so games group under the correct day
+function localDate(kickoff) {
+  if (!kickoff) return 'TBD';
+  const d = new Date(kickoff);
+  return d.getFullYear() + '-' + String(d.getMonth()+1).padStart(2,'0') + '-' + String(d.getDate()).padStart(2,'0');
+}
+function todayLocal() {
+  const d = new Date();
+  return d.getFullYear() + '-' + String(d.getMonth()+1).padStart(2,'0') + '-' + String(d.getDate()).padStart(2,'0');
+}
 let quinielaResults = {};
 let awardsResults = null;
 let currentLang = localStorage.getItem('copa26_lang') || 'en';
@@ -665,8 +677,8 @@ let qCollapsed = {};
 
 function buildDateFilters(barId, currentFilter, setFn) {
   const bar = document.getElementById(barId); if (!bar) return;
-  const todayStr = new Date().toISOString().slice(0, 10);
-  const allDates = [...new Set(ALL_GAMES.filter(g => g.kickoff).map(g => g.kickoff.slice(0, 10)))].sort();
+  const todayStr = todayLocal();
+  const allDates = [...new Set(ALL_GAMES.filter(g => g.kickoff).map(g => localDate(g.kickoff)))].sort();
   const futureDates = allDates.filter(d => d >= todayStr);
   const pastDates = allDates.filter(d => d < todayStr);
   const groups = [...new Set(ALL_GAMES.filter(g => g.group).map(g => g.group))].sort();
@@ -711,20 +723,20 @@ function buildDateFilters(barId, currentFilter, setFn) {
 }
 
 function filterGamesByQ(filter) {
-  const todayStr = new Date().toISOString().slice(0, 10);
+  const todayStr = todayLocal();
   if (filter === 'all') return ALL_GAMES;
-  if (filter === 'today') return ALL_GAMES.filter(g => g.kickoff && g.kickoff.slice(0, 10) === todayStr);
+  if (filter === 'today') return ALL_GAMES.filter(g => g.kickoff && localDate(g.kickoff) === todayStr);
   if (filter === 'ko') return ALL_GAMES.filter(g => g.phase !== 'group');
   if (filter.startsWith('phase-')) return ALL_GAMES.filter(g => g.phase === filter.slice(6));
   if (filter.startsWith('grp-')) return ALL_GAMES.filter(g => g.group === filter.slice(4));
-  return ALL_GAMES.filter(g => g.kickoff && g.kickoff.slice(0, 10) === filter);
+  return ALL_GAMES.filter(g => g.kickoff && localDate(g.kickoff) === filter);
 }
 
 function setQFilter(f) { qFilter = f; buildDateFilters('q-filter-bar', qFilter, 'setQFilter'); renderQuinielaGrid(); }
 
 function groupGamesByDate(games) {
   const map = new Map();
-  games.forEach(g => { const dayKey = g.kickoff ? g.kickoff.slice(0, 10) : 'TBD'; if (!map.has(dayKey)) map.set(dayKey, []); map.get(dayKey).push(g); });
+  games.forEach(g => { const dayKey = g.kickoff ? localDate(g.kickoff) : 'TBD'; if (!map.has(dayKey)) map.set(dayKey, []); map.get(dayKey).push(g); });
   return [...map.entries()].sort((a, b) => a[0].localeCompare(b[0]));
 }
 
@@ -740,7 +752,7 @@ function renderQuinielaGrid() {
   const grid = document.getElementById('quiniela-grid');
   grid.innerHTML = '';
   const games = filterGamesByQ(qFilter);
-  const todayStr = new Date().toISOString().slice(0, 10);
+  const todayStr = todayLocal();
 
   if (!games.length) {
     grid.innerHTML = `<p class="ev-empty">${qFilter === 'today' ? 'No games scheduled today.' : 'No games match this filter.'}</p>`;
@@ -1038,7 +1050,7 @@ function renderQuinielaResultsGrid() {
   const grid = document.getElementById('quiniela-results-grid');
   grid.innerHTML = '';
   const games = filterGamesByQ(qrFilter);
-  const todayStr = new Date().toISOString().slice(0, 10);
+  const todayStr = todayLocal();
 
   if (!games.length) {
     grid.innerHTML = `<p class="ev-empty">${qrFilter === 'today' ? 'No games scheduled today.' : 'No games match this filter.'}</p>`;
@@ -1280,13 +1292,13 @@ function renderEveryone() {
   const content = document.getElementById('everyone-content'); if (!content || !evData) return;
   const { players, games } = evData;
   const now = new Date();
-  const todayStr = now.toISOString().slice(0, 10);
+  const todayStr = todayLocal();
 
   // Filter games
   let filtered;
   if (evFilter === 'all') filtered = games;
   else if (evFilter === 'ko') filtered = games.filter(g => g.phase !== 'group');
-  else if (evFilter === 'today') filtered = games.filter(g => g.kickoff && g.kickoff.slice(0, 10) === todayStr);
+  else if (evFilter === 'today') filtered = games.filter(g => g.kickoff && localDate(g.kickoff) === todayStr);
   else if (evFilter.startsWith('phase-')) filtered = games.filter(g => g.phase === evFilter.slice(6));
   else filtered = games.filter(g => g.group === evFilter);
 
@@ -1309,7 +1321,7 @@ function renderEveryone() {
   // Group by date
   const dayMap = new Map();
   filtered.forEach(g => {
-    const dayKey = g.kickoff ? g.kickoff.slice(0, 10) : 'TBD';
+    const dayKey = g.kickoff ? localDate(g.kickoff) : 'TBD';
     if (!dayMap.has(dayKey)) dayMap.set(dayKey, []);
     dayMap.get(dayKey).push(g);
   });
