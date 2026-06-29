@@ -1928,8 +1928,8 @@ function renderFixPicksGrid() {
     const pa = String(pick.awayGoals ?? '').trim();
     const isDraw = isKnockout && ph !== '' && pa !== '' && ph === pa;
 
-    html += `<div class="q-game${pick.homeGoals !== undefined ? ' has-pick' : ''}${game.locked ? ' q-locked' : ''}">
-      <div class="q-game-meta"><span class="q-grp-tag">${label}</span>${kickTime ? `<span class="q-kick-time">${kickTime}</span>` : ''}${game.locked ? '<span class="q-lock-icon">🔒</span>' : ''}</div>
+    html += `<div class="q-game${pick.homeGoals !== undefined ? ' has-pick' : ''}">
+      <div class="q-game-meta"><span class="q-grp-tag">${label}</span>${kickTime ? `<span class="q-kick-time">${kickTime}</span>` : ''}${game.locked ? '<span class="q-lock-icon" title="Game started">🔒</span>' : ''}</div>
       <div class="q-game-row">
         <div class="q-team home">${esc(game.home)}</div>
         <div class="q-score-wrap">
