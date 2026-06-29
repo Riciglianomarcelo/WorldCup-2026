@@ -1628,33 +1628,33 @@ function showToast(msg) {
 // Layout: R32 → R16 → QF → SF → FINAL ← SF ← QF ← R16 ← R32
 
 const BRACKET_LEFT = {
-  // Upper-left quadrant → QF_1
+  // Left upper → QF_1 (M97)
   upper: {
-    r32: [['R32_02','R32_05'],['R32_01','R32_03']],  // pairs that feed R16
+    r32: [['R32_02','R32_05'],['R32_01','R32_03']],
     r16: ['R16_01','R16_02'],
     qf: 'QF_1',
   },
-  // Lower-left quadrant → QF_3 (note: QF3, not QF2 — FIFA path)
+  // Left lower → QF_2 (M98)
   lower: {
-    r32: [['R32_04','R32_06'],['R32_07','R32_08']],
-    r16: ['R16_03','R16_04'],
-    qf: 'QF_3',
-  },
-  sf: 'SF_1',
-};
-
-const BRACKET_RIGHT = {
-  upper: {
     r32: [['R32_11','R32_12'],['R32_09','R32_10']],
     r16: ['R16_05','R16_06'],
     qf: 'QF_2',
   },
+};
+
+const BRACKET_RIGHT = {
+  // Right upper → QF_3 (M99)
+  upper: {
+    r32: [['R32_04','R32_06'],['R32_07','R32_08']],
+    r16: ['R16_03','R16_04'],
+    qf: 'QF_3',
+  },
+  // Right lower → QF_4 (M100)
   lower: {
     r32: [['R32_14','R32_16'],['R32_13','R32_15']],
     r16: ['R16_07','R16_08'],
     qf: 'QF_4',
   },
-  sf: 'SF_2',
 };
 
 async function loadBracket() {
@@ -1689,7 +1689,15 @@ function bkCard(gid, tm, res) {
   const r = res[gid], has = r && r.homeGoals !== undefined && r.homeGoals !== '';
   const w = bkWinner(gid, tm, res);
   const pen = has && r.penaltyWinner ? ' <small>(P)</small>' : '';
+  // Kickoff date/time
+  const game = ALL_GAMES.find(g => g.id === gid);
+  let dateLabel = '';
+  if (game && game.kickoff) {
+    const dt = new Date(game.kickoff);
+    dateLabel = `<div class="bk-date">${dt.toLocaleDateString(undefined,{month:'2-digit',day:'2-digit'})} ${dt.toLocaleTimeString(undefined,{hour:'2-digit',minute:'2-digit'})}</div>`;
+  }
   return `<div class="bk-card">
+    ${dateLabel}
     <div class="bk-t ${w==='home'?'bk-w':''}${has&&w!=='home'?' bk-l':''}"><span>${esc(home)}</span>${has?`<b>${r.homeGoals}</b>`:''}</div>
     <div class="bk-t ${w==='away'?'bk-w':''}${has&&w!=='away'?' bk-l':''}"><span>${esc(away)}</span>${has?`<b>${r.awayGoals}${pen}</b>`:''}</div>
   </div>`;
@@ -1723,11 +1731,6 @@ function bkHalf(data, tm, res, mirror) {
   h += bkCard(data.lower.qf, tm, res);
   h += `</div></div>`;
 
-  // SF column
-  h += `<div class="bk-col bk-c3"><div class="bk-hdr">SF</div>`;
-  h += bkCard(data.sf, tm, res);
-  h += `</div>`;
-
   h += `</div>`;
   return h;
 }
@@ -1737,12 +1740,14 @@ function renderBracket(tm, res) {
   if (!c) return;
   let h = `<div class="bk-wrap">`;
   h += bkHalf(BRACKET_LEFT, tm, res, false);
-  // Final column
+  // Center: SF + Final + 3rd
   h += `<div class="bk-center">`;
+  h += `<div class="bk-sf-box"><div class="bk-col-hdr-sm">SF</div>${bkCard('SF_1', tm, res)}</div>`;
   h += `<div class="bk-final-label">🏆 FINAL</div>`;
   h += bkCard('FINAL', tm, res);
   h += `<div class="bk-3rd-label">3rd Place</div>`;
   h += bkCard('3RD', tm, res);
+  h += `<div class="bk-sf-box"><div class="bk-col-hdr-sm">SF</div>${bkCard('SF_2', tm, res)}</div>`;
   h += `</div>`;
   h += bkHalf(BRACKET_RIGHT, tm, res, true);
   h += `</div>`;
