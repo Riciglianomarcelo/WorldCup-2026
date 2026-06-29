@@ -1497,6 +1497,7 @@ async function loadAdmin() {
   ensureAdminSecret();
   loadKnockoutTeams();
   loadSyncStatus();
+  loadFixPicksUsers();
   let res = await authFetch('/api/admin/players');
   if (res.status === 403 || res.status === 503) {
     // wrong/missing secret — clear and ask again once
@@ -1886,6 +1887,128 @@ async function saveKnockoutTeams() {
 
 document.getElementById('save-knockout-btn')?.addEventListener('click', saveKnockoutTeams);
 document.getElementById('knockout-phase-select')?.addEventListener('change', renderKnockoutEditor);
+
+// ── FIX PLAYER PICKS (admin) ─────────────────────────────────────────────────
+let fixPicksUsers = [];
+let fixPicksSelected = null;
+let fixPicksData = {};
+
+async function loadFixPicksUsers() {
+  try {
+    const res = await authFetch('/api/admin/users-picks');
+    const data = await res.json();
+    fixPicksUsers = data.users || [];
+    const sel = document.getElementById('fix-picks-user');
+    if (!sel) return;
+    sel.innerHTML = '<option value="">Select a player…</option>';
+    fixPicksUsers.forEach(u => {
+      sel.innerHTML += `<option value="${u.userId}">${esc(u.name)} (${Object.keys(u.picks).length} picks)</option>`;
+    });
+  } catch(e) { console.error(e); }
+}
+
+function renderFixPicksGrid() {
+  const grid = document.getElementById('fix-picks-grid');
+  const footer = document.getElementById('fix-picks-footer');
+  if (!grid || !fixPicksSelected) return;
+  footer?.classList.remove('hidden');
+
+  const user = fixPicksUsers.find(u => u.userId === fixPicksSelected);
+  if (!user) { grid.innerHTML = '<p>User not found</p>'; return; }
+  fixPicksData = { ...user.picks };
+
+  let html = '';
+  ALL_GAMES.forEach(game => {
+    const pick = fixPicksData[game.id] || {};
+    const kickTime = game.kickoff ? new Date(game.kickoff).toLocaleString(undefined, { month:'short', day:'numeric', hour:'2-digit', minute:'2-digit' }) : '';
+    const phaseLabels = {r32:'R32',r16:'R16',qf:'QF',sf:'SF','3rd':'3rd',final:'Final'};
+    const label = game.phase === 'group' ? `Grp ${game.group}` : (phaseLabels[game.phase] || game.id);
+    const isKnockout = game.phase !== 'group';
+    const ph = String(pick.homeGoals ?? '').trim();
+    const pa = String(pick.awayGoals ?? '').trim();
+    const isDraw = isKnockout && ph !== '' && pa !== '' && ph === pa;
+
+    html += `<div class="q-game${pick.homeGoals !== undefined ? ' has-pick' : ''}${game.locked ? ' q-locked' : ''}">
+      <div class="q-game-meta"><span class="q-grp-tag">${label}</span>${kickTime ? `<span class="q-kick-time">${kickTime}</span>` : ''}${game.locked ? '<span class="q-lock-icon">🔒</span>' : ''}</div>
+      <div class="q-game-row">
+        <div class="q-team home">${esc(game.home)}</div>
+        <div class="q-score-wrap">
+          <input class="q-score-input" type="number" min="0" max="20"
+            id="fp-h-${game.id}" value="${pick.homeGoals??''}" placeholder="H"
+            data-game="${game.id}" data-side="h" data-ctx="fixpick"/>
+          <span class="q-dash">—</span>
+          <input class="q-score-input" type="number" min="0" max="20"
+            id="fp-a-${game.id}" value="${pick.awayGoals??''}" placeholder="A"
+            data-game="${game.id}" data-side="a" data-ctx="fixpick"/>
+        </div>
+        <div class="q-team away">${esc(game.away)}</div>
+      </div>
+      ${isKnockout ? `<div class="q-penalty-row ${isDraw ? '' : 'hidden'}" id="fp-pen-${game.id}">
+        <span class="q-pen-label">⚽ Penalties:</span>
+        <div class="q-pen-btns">
+          <button type="button" class="q-pen-btn ${pick.penaltyWinner==='home'?'active':''}" data-game="${game.id}" data-pw="home" data-ctx="fixpick">${esc(game.home)}</button>
+          <button type="button" class="q-pen-btn ${pick.penaltyWinner==='away'?'active':''}" data-game="${game.id}" data-pw="away" data-ctx="fixpick">${esc(game.away)}</button>
+        </div>
+      </div>` : ''}
+    </div>`;
+  });
+  grid.innerHTML = html;
+
+  // Add listeners
+  grid.querySelectorAll('.q-score-input[data-ctx="fixpick"]').forEach(inp => {
+    inp.addEventListener('change', () => {
+      const gid = inp.dataset.game, side = inp.dataset.side;
+      if (!fixPicksData[gid]) fixPicksData[gid] = {};
+      if (side === 'h') fixPicksData[gid].homeGoals = inp.value;
+      else fixPicksData[gid].awayGoals = inp.value;
+      const game = ALL_GAMES.find(g => g.id === gid);
+      if (game && game.phase !== 'group') {
+        const penRow = document.getElementById('fp-pen-' + gid);
+        if (penRow) {
+          const h = String(fixPicksData[gid].homeGoals ?? '').trim();
+          const a = String(fixPicksData[gid].awayGoals ?? '').trim();
+          penRow.classList.toggle('hidden', !(h !== '' && a !== '' && h === a));
+        }
+      }
+    });
+  });
+  grid.querySelectorAll('.q-pen-btn[data-ctx="fixpick"]').forEach(btn => {
+    btn.addEventListener('click', () => {
+      const gid = btn.dataset.game, pw = btn.dataset.pw;
+      if (!fixPicksData[gid]) fixPicksData[gid] = {};
+      fixPicksData[gid].penaltyWinner = pw;
+      const row = document.getElementById('fp-pen-' + gid);
+      if (row) row.querySelectorAll('.q-pen-btn').forEach(b => b.classList.toggle('active', b.dataset.pw === pw));
+    });
+  });
+}
+
+async function saveFixPicks() {
+  if (!fixPicksSelected) return;
+  // Collect only games with values
+  const picks = {};
+  ALL_GAMES.forEach(game => {
+    const h = document.getElementById(`fp-h-${game.id}`)?.value;
+    const a = document.getElementById(`fp-a-${game.id}`)?.value;
+    if (h !== '' && h !== undefined && a !== '' && a !== undefined) {
+      const entry = { homeGoals: h, awayGoals: a };
+      if (fixPicksData[game.id]?.penaltyWinner) entry.penaltyWinner = fixPicksData[game.id].penaltyWinner;
+      picks[game.id] = entry;
+    }
+  });
+  try {
+    const res = await authFetch('/api/admin/fix-picks', { method: 'POST', body: JSON.stringify({ userId: fixPicksSelected, picks }) });
+    const data = await res.json();
+    showToast(data.success ? `✅ Fixed ${data.applied} picks` : '❌ ' + data.error);
+  } catch(e) { showToast('❌ ' + e.message); }
+}
+
+document.getElementById('fix-picks-load')?.addEventListener('click', () => {
+  fixPicksSelected = document.getElementById('fix-picks-user')?.value;
+  if (!fixPicksSelected) { showToast('Select a player first'); return; }
+  renderFixPicksGrid();
+});
+document.getElementById('fix-picks-save')?.addEventListener('click', saveFixPicks);
 
 // ── GROUPS STANDINGS ──────────────────────────────────────────────────────────
 let groupsCache = null;
