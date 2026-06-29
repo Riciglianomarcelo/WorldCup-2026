@@ -1789,10 +1789,17 @@ function renderKnockoutEditor() {
     const hasReal = saved.home && !saved.home.includes('Home');
     const pathInfo = bracketPath[game.id] || '';
 
+    // Format kickoff date/time for admin reference
+    let kickLabel = '';
+    if (game.kickoff) {
+      const dt = new Date(game.kickoff);
+      kickLabel = dt.toLocaleDateString(undefined, { weekday:'short', month:'short', day:'numeric' }) + ' ' + dt.toLocaleTimeString(undefined, { hour:'2-digit', minute:'2-digit' });
+    }
+
     const div = document.createElement('div');
     div.className = 'knockout-game-row';
     div.innerHTML = `
-      <div class="knockout-game-label">${currentLang==='es' ? game.labelEs : game.label}${pathInfo ? ` <span class="ko-path-info">${pathInfo}</span>` : ''}</div>
+      <div class="knockout-game-label">${currentLang==='es' ? game.labelEs : game.label}${kickLabel ? ` <span class="ko-date-info">📅 ${kickLabel}</span>` : ''}${pathInfo ? ` <span class="ko-path-info">${pathInfo}</span>` : ''}</div>
       <div class="knockout-team-inputs">
         <input type="text" 
           id="ko-home-${game.id}" 
