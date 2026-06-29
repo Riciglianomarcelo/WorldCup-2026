@@ -555,6 +555,39 @@ app.post('/api/quiniela/picks', requireAuth, async (req, res) => {
   } catch(e) { res.status(500).json({ error: e.message }); }
 });
 
+// ─── ADMIN: FIX PLAYER PICKS (bypasses lock) ────────────────────────────────
+app.post('/api/admin/fix-picks', requireAdmin, async (req, res) => {
+  try {
+    const { userId, picks } = req.body; // { userId, picks: { gameId: { homeGoals, awayGoals, penaltyWinner? } } }
+    if (!userId || !picks) return res.status(400).json({ error: 'Need userId and picks' });
+    const existing = await db.quiniela_picks.findOne({ userId });
+    if (!existing) return res.status(404).json({ error: 'User not found in picks DB' });
+    const current = { ...existing.picks };
+    let applied = 0;
+    for (const [gameId, pick] of Object.entries(picks)) {
+      current[gameId] = pick;
+      applied++;
+    }
+    await db.quiniela_picks.update({ userId }, { $set: { picks: current, updatedAt: new Date().toISOString(), fixedByAdmin: true } });
+    res.json({ success: true, applied, userId });
+  } catch(e) { res.status(500).json({ error: e.message }); }
+});
+
+// ─── ADMIN: LIST ALL USERS (for fix-picks) ──────────────────────────────────
+app.get('/api/admin/users-picks', requireAdmin, async (req, res) => {
+  try {
+    const users = await db.users.find({});
+    const allPicks = await db.quiniela_picks.find({});
+    const picksMap = {};
+    allPicks.forEach(p => { picksMap[p.userId] = p.picks || {}; });
+    const result = users.map(u => ({
+      userId: u._id, name: u.name, avatar: u.avatar,
+      picks: picksMap[u._id] || {},
+    }));
+    res.json({ users: result });
+  } catch(e) { res.status(500).json({ error: e.message }); }
+});
+
 // ─── QUINIELA RESULTS (admin sets them) ──────────────────────────────────────
 app.get('/api/quiniela/results', async (req, res) => {
   const r = await db.quiniela_results.findOne({ _id: 'official' });
