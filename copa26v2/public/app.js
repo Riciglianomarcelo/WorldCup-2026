@@ -2180,7 +2180,7 @@ document.getElementById('btn-send-blast')?.addEventListener('click', async () =>
 
   btn.disabled = true; btn.textContent = '📤 Sending...';
   try {
-    const [lbRes, gamesRes] = await Promise.all([fetch('/api/leaderboard'), authFetch('/api/games')]);
+    const [lbRes, gamesRes] = await Promise.all([fetch('/api/leaderboard'), authFetch('/api/schedule')]);
     const lb = await lbRes.json();
     const gamesData = await gamesRes.json();
     lb.games = gamesData.games || [];
