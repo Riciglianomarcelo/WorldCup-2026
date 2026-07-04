@@ -2092,15 +2092,34 @@ const EMAIL_TEMPLATES = {
     `,
   },
   predictions: {
-    subject: '🔒 Copa 26 — Submit your predictions before kickoff!',
-    build: (lb) => `
-      <h2>🎯 Don't forget your predictions!</h2>
-      <p>Games are coming up and some of you haven't submitted predictions yet. Once a match kicks off, your pick for that game <strong>locks permanently</strong>.</p>
-      <div class="banner">⏰ Go to the <strong>Quiniela</strong> tab, fill in your scores, and hit <strong>Save</strong>. Takes 5 minutes.</div>
-      <p>Remember: <strong>3 pts</strong> for correct winner, <strong>5 pts</strong> for exact score, <strong>+1 pt</strong> for correct penalty winner in knockouts. Pick the finalists (+5 each) and champion (+10)!</p>
-      <p>Don't give free points to everyone else — get your picks in!</p>
-      ${buildStandingsHtml(lb)}
-    `,
+    subject: '🚨 Copa 26 — R16 starts TODAY! Lock your picks NOW',
+    build: (lb) => {
+      // Build today's games list from ALL_GAMES
+      const todayStr = new Date().toISOString().slice(0, 10);
+      const todayGames = (lb?.games || []).filter(g => {
+        if (!g.kickoff) return false;
+        const d = new Date(g.kickoff);
+        const local = d.getFullYear() + '-' + String(d.getMonth()+1).padStart(2,'0') + '-' + String(d.getDate()).padStart(2,'0');
+        return local === todayStr;
+      });
+      const gamesHtml = todayGames.length ? `<h2>⚽ Today's Matches</h2>` + todayGames.map(g => {
+        const t = new Date(g.kickoff).toLocaleTimeString('en-US', { hour:'2-digit', minute:'2-digit', timeZone:'America/New_York' });
+        return `<div class="gr"><div class="tm">${g.home}</div><div class="sc">${t}</div><div class="tm r">${g.away}</div></div>`;
+      }).join('') : '';
+      return `
+        <div style="text-align:center;margin-bottom:14px">
+          <img src="https://media.giphy.com/media/v1.Y2lkPTc5MGI3NjExcWRuNXNxdmRmMmE3OWFtZWpla3c0d2toazRxYXBmeDNlMHpkYnZiZiZlcD12MV9naWZzX3NlYXJjaCZjdD1n/JqDcpPX8vWahUny0w7/giphy.gif" alt="⚽" style="width:100%;max-width:320px;border-radius:12px" />
+        </div>
+        <h2>🚨 Don't forget your predictions!</h2>
+        <p>The <strong>knockout stage is HERE</strong>. No second chances — lose and you're out. Same goes for your picks!</p>
+        <p>Games are coming up and some of you haven't submitted predictions yet. Once a match kicks off, your pick for that game <strong>locks permanently</strong>.</p>
+        ${gamesHtml}
+        <div class="banner">⏰ Go to the <strong>Quiniela</strong> tab, fill in your scores, and hit <strong>Save</strong>. Takes 5 minutes.</div>
+        <p>Remember: <strong>3 pts</strong> for correct winner, <strong>5 pts</strong> for exact score, <strong>+1 pt</strong> for correct penalty winner in knockouts. Pick the finalists (+5 each) and champion (+10)!</p>
+        <p style="font-size:15px;font-weight:700;color:#c0392b;margin-top:14px">⚠️ Don't give free points to everyone else — get your picks in NOW!</p>
+        ${buildStandingsHtml(lb)}
+      `;
+    },
   },
   results: {
     subject: '📊 Copa 26 — Today\'s results are in!',
@@ -2117,7 +2136,7 @@ function buildStandingsHtml(lb) {
   if (!lb?.leaderboard?.length) return '';
   return `<h2>📊 Current Standings</h2>` +
     lb.leaderboard.map((p, i) =>
-      `<div class="lbr"><div class="rk">${i+1}</div><div class="nm">${p.avatar} ${p.name}</div><div class="pt">${p.totalPts} pts</div></div>`
+      `<div class="lbr"><div class="rk">${i+1}</div><div class="nm">${p.avatar} ${p.name}</div><div class="pt">${p.totalScore} pts</div></div>`
     ).join('');
 }
 
@@ -2161,7 +2180,10 @@ document.getElementById('btn-send-blast')?.addEventListener('click', async () =>
 
   btn.disabled = true; btn.textContent = '📤 Sending...';
   try {
-    const lb = await (await fetch('/api/leaderboard')).json();
+    const [lbRes, gamesRes] = await Promise.all([fetch('/api/leaderboard'), authFetch('/api/games')]);
+    const lb = await lbRes.json();
+    const gamesData = await gamesRes.json();
+    lb.games = gamesData.games || [];
     const template = EMAIL_TEMPLATES[type];
 
     const r = await authFetch('/api/admin/send-blast', {
