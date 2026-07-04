@@ -649,9 +649,12 @@ app.get('/api/picks/transparency', requireAuth, async (req, res) => {
     const users = await db.users.find({});
     const allPicks = await db.quiniela_picks.find({});
     const qResults = await db.quiniela_results.findOne({ _id: 'official' });
+    const koTeams = await db.knockout_teams.find({});
     const results = qResults?.data || {};
     const picksMap = {};
     allPicks.forEach(p => { picksMap[p.userId] = p.picks || {}; });
+    const teamOverrides = {};
+    koTeams.forEach(t => { teamOverrides[t.gameId] = t; });
     const isFilled = p => p && String(p.homeGoals).trim() !== '' && String(p.awayGoals).trim() !== '';
     const players = users.map(u => ({ id: u._id, name: u.name, avatar: u.avatar }));
 
@@ -660,7 +663,10 @@ app.get('/api/picks/transparency', requireAuth, async (req, res) => {
       const locked  = isLocked(g.id);
       const r       = results[g.id];
       const result  = r ? { homeGoals: r.homeGoals, awayGoals: r.awayGoals, penaltyWinner: r.penaltyWinner || null } : null;
-      const base    = { id: g.id, home: g.home, away: g.away, group: g.group, phase: g.phase, kickoff, locked, result };
+      const override = teamOverrides[g.id];
+      const home = override?.home || g.home;
+      const away = override?.away || g.away;
+      const base    = { id: g.id, home, away, group: g.group, phase: g.phase, kickoff, locked, result };
 
       if (locked) {
         const playerPicks = {};
@@ -1339,14 +1345,20 @@ async function notifyMorningReminder() {
   const hourUTC = nowUTC.getUTCHours();
   if (hourUTC < 11 || hourUTC >= 14) return;
 
-  // Find today's games
+  // Find today's games (group + knockout)
   const todayGames = [];
-  for (const [gid, f] of Object.entries(GROUP_FIXTURES)) {
-    if (!f.kickoff) continue;
-    const ko = new Date(f.kickoff);
+  const koTeams = await db.knockout_teams.find({});
+  const teamOverrides = {};
+  koTeams.forEach(t => { teamOverrides[t.gameId] = t; });
+
+  for (const game of ALL_GAMES) {
+    const kickoff = GROUP_FIXTURES[game.id]?.kickoff || KNOCKOUT_FIXTURES[game.id] || null;
+    if (!kickoff) continue;
+    const ko = new Date(kickoff);
     if (ko.toISOString().slice(0, 10) === todayKey) {
-      const game = ALL_GAMES.find(g => g.id === gid);
-      if (game) todayGames.push({ ...game, kickoff: f.kickoff, ko });
+      const home = teamOverrides[game.id]?.home || game.home;
+      const away = teamOverrides[game.id]?.away || game.away;
+      todayGames.push({ ...game, home, away, kickoff, ko });
     }
   }
   if (!todayGames.length) return;
